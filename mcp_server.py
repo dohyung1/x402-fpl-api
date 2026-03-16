@@ -128,6 +128,28 @@ async def transfer_suggestions(
 
 
 @mcp.tool()
+async def player_comparison(player_names: list[str], gameweeks_ahead: int = 5) -> dict:
+    """
+    Compare 2-4 FPL players head-to-head across all key metrics.
+
+    Give player names (e.g., "Salah", "Palmer", "Saka") and get a detailed
+    side-by-side breakdown: form, xG/90, xA/90, ICT index, points per game,
+    cost, ownership, captain score, upcoming fixtures with FDR, transfer
+    momentum, and value per million.
+
+    Includes a verdict recommending the best pick with reasoning.
+    Names are fuzzy-matched — partial names like "Salah" or "Palmer" work fine.
+
+    Args:
+        player_names: List of 2-4 player names to compare (e.g., ["Salah", "Palmer", "Saka"]).
+        gameweeks_ahead: How many gameweeks of fixtures to include (1-10). Default 5.
+    """
+    from app.algorithms.compare import compare_players
+
+    return await compare_players(player_names=player_names, gameweeks_ahead=gameweeks_ahead)
+
+
+@mcp.tool()
 async def live_points(team_id: int) -> dict:
     """
     Get live points for a specific FPL team during an active gameweek.
@@ -329,6 +351,56 @@ async def fpl_manager_hub(
             "likely_fallers": price_result.get("likely_fallers", [])[:5],
         },
     }
+
+
+@mcp.tool()
+async def is_hit_worth_it(
+    player_out_id: int,
+    player_in_id: int,
+    gameweeks_ahead: int = 5,
+) -> dict:
+    """
+    Analyze whether taking a -4 point hit for a transfer is worth it.
+
+    Projects expected points for both players over the next N gameweeks,
+    accounting for form, fixture difficulty, home/away advantage, and
+    playing chance. If the incoming player's projected surplus exceeds
+    the 4-point cost, the hit is recommended.
+
+    Args:
+        player_out_id: FPL element ID of the player being sold.
+        player_in_id: FPL element ID of the player being bought.
+        gameweeks_ahead: How many gameweeks to project over (1-10). Default 5.
+    """
+    from app.algorithms.hit_analyzer import analyze_hit
+
+    return await analyze_hit(
+        player_out_id=player_out_id,
+        player_in_id=player_in_id,
+        gameweeks_ahead=gameweeks_ahead,
+    )
+
+
+@mcp.tool()
+async def chip_strategy(team_id: int) -> dict:
+    """
+    Recommend when to use each remaining FPL chip for maximum impact.
+
+    Scans the next 10 gameweeks to find the optimal timing for each
+    unused chip (Bench Boost, Triple Captain, Free Hit, Wildcard) based
+    on fixture difficulty, double/blank gameweeks, and squad health.
+
+    - Bench Boost: best when bench players have easy fixtures + DGW
+    - Triple Captain: best when top captain has easiest fixture + DGW
+    - Free Hit: best when many teams blank or huge fixture swings
+    - Wildcard: best when 4+ squad players have bad form + tough fixtures
+
+    Args:
+        team_id: Your FPL team ID (find it in the URL when you view your team on the FPL website).
+    """
+    from app.algorithms.chips import get_chip_strategy
+
+    return await get_chip_strategy(team_id=team_id)
 
 
 # ---------------------------------------------------------------------------
