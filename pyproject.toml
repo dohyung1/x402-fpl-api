@@ -1,6 +1,6 @@
 [project]
 name = "fpl-intelligence"
-version = "0.2.0"
+version = "0.2.1"
 description = "AI-powered Fantasy Premier League MCP server — captain picks, transfer suggestions, player comparison, chip strategy, and more"
 readme = "README.md"
 license = {text = "MIT"}
