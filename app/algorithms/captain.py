@@ -1,18 +1,20 @@
 """
-Captain Pick algorithm v2.
+Captain Pick algorithm v2.1 — backtest-tuned weights.
 
-captain_score_v2 =
-    xG_per_90 * 5.0              # expected goals per 90 (strongest signal)
-  + xA_per_90 * 3.0              # expected assists per 90
-  + form * 1.5                   # reduced from 2.0 -- form is noisy
-  + points_per_game * 1.0        # keep
-  + home_bonus (1.5 if home)     # keep
-  - fixture_difficulty * 1.0     # keep FDR
-  + ict_index * 0.01             # keep
-  + bonus_per_game * 0.5         # keep
-  + penalty_taker_bonus * 2.0    # 2.0 if penalties_order == 1
-  + minutes_certainty * 1.0      # starts / possible_starts
-  - playing_chance_penalty        # use chance_of_playing (0 if 100%, -10 if 0%, scaled)
+captain_score =
+    points_per_game * 3.0        # highest single-GW correlation (0.42)
+  + form * 2.5                   # strong correlation (0.26)
+  + xG_per_90 * 2.0              # reduced from 5.0 — low single-GW correlation
+  + xA_per_90 * 1.5              # reduced from 3.0 — low single-GW correlation
+  + home_bonus (1.5 if home)
+  - fixture_difficulty * 1.5     # increased — FDR matters
+  + ict_index * 0.01
+  + bonus_per_game * 1.0         # increased from 0.5
+  + penalty_taker_bonus * 2.0
+  + minutes_certainty * 1.0
+  - playing_chance_penalty
+
+Weights tuned against GW1-29 actuals via scripts/backtest.py.
 """
 
 from app.fpl_client import get_bootstrap, get_next_gameweek, get_fixtures
@@ -21,16 +23,16 @@ from app.fpl_client import get_bootstrap, get_next_gameweek, get_fixtures
 INJURY_STATUSES = {"i", "d", "s", "u"}  # injured, doubtful, suspended, unavailable
 
 WEIGHTS = {
-    "xg90": 5.0,
-    "xa90": 3.0,
-    "form": 1.5,
-    "ppg": 1.0,
-    "home": 1.5,
-    "fdr": 1.0,
-    "ict": 0.01,
-    "bonus_pg": 0.5,
-    "penalty": 2.0,
-    "minutes_cert": 1.0,
+    "xg90": 2.0,           # reduced — low single-GW correlation per backtest
+    "xa90": 1.5,           # reduced — low single-GW correlation per backtest
+    "form": 2.5,           # strongest predictor after PPG per backtest
+    "ppg": 3.0,            # highest correlation with actual GW points (0.42)
+    "home": 2.0,           # increased — home advantage is a key differentiator
+    "fdr": 2.0,            # increased — fixture difficulty should drive pick variation
+    "ict": 0.01,           # keep
+    "bonus_pg": 1.0,       # increased — bonus correlates well
+    "penalty": 1.5,        # reduced — less important than fixture context
+    "minutes_cert": 1.0,   # keep
     "playing_chance_max_penalty": -10.0,
 }
 
