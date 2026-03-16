@@ -22,7 +22,7 @@ POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
 
 # Rough FPL threshold: net ~1M transfers triggers a price change (±0.1m)
 # We normalise relative to this to give a probability estimate
-RISE_THRESHOLD = 500_000   # conservative
+RISE_THRESHOLD = 500_000  # conservative
 FALL_THRESHOLD = -500_000
 
 

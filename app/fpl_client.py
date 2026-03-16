@@ -165,9 +165,7 @@ async def get_manager_status(team_id: int, bootstrap: dict) -> dict:
 
     # Calculate free transfers for next GW
     chips = history_data.get("chips", [])
-    chip_this_gw = next(
-        (c["name"] for c in chips if c["event"] == current_gw), None
-    )
+    chip_this_gw = next((c["name"] for c in chips if c["event"] == current_gw), None)
 
     if chip_this_gw in ("wildcard", "freehit"):
         free_transfers = 1

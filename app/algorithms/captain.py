@@ -17,22 +17,22 @@ captain_score =
 Weights tuned against GW1-29 actuals via scripts/backtest.py.
 """
 
-from app.fpl_client import get_bootstrap, get_next_gameweek, get_fixtures
+from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek
 
 # Statuses that warrant a full injury penalty
 INJURY_STATUSES = {"i", "d", "s", "u"}  # injured, doubtful, suspended, unavailable
 
 WEIGHTS = {
-    "xg90": 2.0,           # reduced — low single-GW correlation per backtest
-    "xa90": 1.5,           # reduced — low single-GW correlation per backtest
-    "form": 2.5,           # strongest predictor after PPG per backtest
-    "ppg": 3.0,            # highest correlation with actual GW points (0.42)
-    "home": 2.0,           # increased — home advantage is a key differentiator
-    "fdr": 2.0,            # increased — fixture difficulty should drive pick variation
-    "ict": 0.01,           # keep
-    "bonus_pg": 1.0,       # increased — bonus correlates well
-    "penalty": 1.5,        # reduced — less important than fixture context
-    "minutes_cert": 1.0,   # keep
+    "xg90": 2.0,  # reduced — low single-GW correlation per backtest
+    "xa90": 1.5,  # reduced — low single-GW correlation per backtest
+    "form": 2.5,  # strongest predictor after PPG per backtest
+    "ppg": 3.0,  # highest correlation with actual GW points (0.42)
+    "home": 2.0,  # increased — home advantage is a key differentiator
+    "fdr": 2.0,  # increased — fixture difficulty should drive pick variation
+    "ict": 0.01,  # keep
+    "bonus_pg": 1.0,  # increased — bonus correlates well
+    "penalty": 1.5,  # reduced — less important than fixture context
+    "minutes_cert": 1.0,  # keep
     "playing_chance_max_penalty": -10.0,
 }
 
@@ -78,13 +78,9 @@ def _build_fixture_map(fixtures: list, gameweek: int) -> dict[int, list[dict]]:
         away_fdr = fix["team_a_difficulty"]
 
         # Home team
-        fixture_map.setdefault(home_id, []).append(
-            {"fdr": home_fdr, "is_home": True, "opponent": away_id}
-        )
+        fixture_map.setdefault(home_id, []).append({"fdr": home_fdr, "is_home": True, "opponent": away_id})
         # Away team
-        fixture_map.setdefault(away_id, []).append(
-            {"fdr": away_fdr, "is_home": False, "opponent": home_id}
-        )
+        fixture_map.setdefault(away_id, []).append({"fdr": away_fdr, "is_home": False, "opponent": home_id})
 
     return fixture_map
 
@@ -250,11 +246,13 @@ async def get_captain_picks(gameweek: int | None = None, top_n: int = 5) -> dict
             for fix in player_fixtures:
                 opponent_id = fix["opponent"]
                 opponent = teams.get(opponent_id, {}).get("short_name", "?")
-                fixture_entries.append({
-                    "opponent": opponent,
-                    "venue": "Home" if fix["is_home"] else "Away",
-                    "fdr": fix["fdr"],
-                })
+                fixture_entries.append(
+                    {
+                        "opponent": opponent,
+                        "venue": "Home" if fix["is_home"] else "Away",
+                        "fdr": fix["fdr"],
+                    }
+                )
             fixture_info = {
                 "fixtures": fixture_entries,
                 "gameweek": gameweek,

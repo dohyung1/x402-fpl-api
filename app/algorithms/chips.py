@@ -11,19 +11,18 @@ and squad health.
 
 import asyncio
 
-from app.fpl_client import (
-    get_bootstrap,
-    get_fixtures,
-    get_current_gameweek,
-    get_next_gameweek,
-    get_team_picks,
-    get_team_history,
-)
 from app.algorithms.captain import (
-    POSITION_MAP,
     INJURY_STATUSES,
     _build_fixture_map,
     _score_player,
+)
+from app.fpl_client import (
+    get_bootstrap,
+    get_current_gameweek,
+    get_fixtures,
+    get_next_gameweek,
+    get_team_history,
+    get_team_picks,
 )
 
 # How many gameweeks ahead to scan for chip opportunities
@@ -110,8 +109,7 @@ async def get_chip_strategy(team_id: int) -> dict:
             "gameweek": current_gw,
             "chips_remaining": [],
             "chips_used": [
-                {"chip": CHIP_DISPLAY.get(c["name"], c["name"]), "gameweek": c["event"]}
-                for c in chips_used_list
+                {"chip": CHIP_DISPLAY.get(c["name"], c["name"]), "gameweek": c["event"]} for c in chips_used_list
             ],
             "recommendations": [],
             "message": "All chips have been used this season.",
@@ -194,18 +192,20 @@ async def get_chip_strategy(team_id: int) -> dict:
             if stats["fixture_count"] > 10:
                 reasoning_parts.append(f"{stats['fixture_count']} fixtures scheduled")
 
-            recommendations.append({
-                "chip": "Bench Boost",
-                "chip_code": "bboost",
-                "recommended_gameweek": best_bb_gw,
-                "confidence_score": round(best_bb_score, 1),
-                "reasoning": ". ".join(reasoning_parts) + ".",
-                "gw_details": {
-                    "dgw_teams": stats["dgw_teams"],
-                    "fixture_count": stats["fixture_count"],
-                    "avg_fdr": stats["avg_fdr"],
-                },
-            })
+            recommendations.append(
+                {
+                    "chip": "Bench Boost",
+                    "chip_code": "bboost",
+                    "recommended_gameweek": best_bb_gw,
+                    "confidence_score": round(best_bb_score, 1),
+                    "reasoning": ". ".join(reasoning_parts) + ".",
+                    "gw_details": {
+                        "dgw_teams": stats["dgw_teams"],
+                        "fixture_count": stats["fixture_count"],
+                        "avg_fdr": stats["avg_fdr"],
+                    },
+                }
+            )
 
     # --- TRIPLE CAPTAIN ---
     if "3xc" in chips_remaining:
@@ -239,37 +239,35 @@ async def get_chip_strategy(team_id: int) -> dict:
         if best_tc_gw and best_tc_player:
             stats = gw_stats[best_tc_gw]
             player_team = teams_by_id.get(best_tc_player["team"], {}).get("short_name", "?")
-            reasoning_parts = [
-                f"Best captain option is {best_tc_player['web_name']} ({player_team})"
-            ]
+            reasoning_parts = [f"Best captain option is {best_tc_player['web_name']} ({player_team})"]
             if stats["dgw_teams"] > 0:
                 reasoning_parts.append(f"{stats['dgw_teams']} teams have DGW")
 
             # Check if the top player has a DGW
             player_fixes = stats["fixture_map"].get(best_tc_player["team"], [])
             if len(player_fixes) > 1:
-                reasoning_parts.append(
-                    f"{best_tc_player['web_name']} has {len(player_fixes)} fixtures"
-                )
+                reasoning_parts.append(f"{best_tc_player['web_name']} has {len(player_fixes)} fixtures")
 
-            recommendations.append({
-                "chip": "Triple Captain",
-                "chip_code": "3xc",
-                "recommended_gameweek": best_tc_gw,
-                "confidence_score": round(best_tc_score, 1),
-                "suggested_captain": {
-                    "id": best_tc_player["id"],
-                    "name": best_tc_player["web_name"],
-                    "team": player_team,
-                    "form": float(best_tc_player.get("form") or 0),
-                },
-                "reasoning": ". ".join(reasoning_parts) + ".",
-                "gw_details": {
-                    "dgw_teams": stats["dgw_teams"],
-                    "fixture_count": stats["fixture_count"],
-                    "avg_fdr": stats["avg_fdr"],
-                },
-            })
+            recommendations.append(
+                {
+                    "chip": "Triple Captain",
+                    "chip_code": "3xc",
+                    "recommended_gameweek": best_tc_gw,
+                    "confidence_score": round(best_tc_score, 1),
+                    "suggested_captain": {
+                        "id": best_tc_player["id"],
+                        "name": best_tc_player["web_name"],
+                        "team": player_team,
+                        "form": float(best_tc_player.get("form") or 0),
+                    },
+                    "reasoning": ". ".join(reasoning_parts) + ".",
+                    "gw_details": {
+                        "dgw_teams": stats["dgw_teams"],
+                        "fixture_count": stats["fixture_count"],
+                        "avg_fdr": stats["avg_fdr"],
+                    },
+                }
+            )
 
     # --- FREE HIT ---
     if "freehit" in chips_remaining:
@@ -307,23 +305,23 @@ async def get_chip_strategy(team_id: int) -> dict:
                 reasoning_parts.append(f"{stats['blank_teams']} teams have no fixture (blank GW)")
             if stats["dgw_teams"] > 0:
                 reasoning_parts.append(f"{stats['dgw_teams']} teams have DGW")
-            reasoning_parts.append(
-                f"high fixture variance makes squad restructuring valuable"
-            )
+            reasoning_parts.append("high fixture variance makes squad restructuring valuable")
 
-            recommendations.append({
-                "chip": "Free Hit",
-                "chip_code": "freehit",
-                "recommended_gameweek": best_fh_gw,
-                "confidence_score": round(best_fh_score, 1),
-                "reasoning": ". ".join(reasoning_parts) + ".",
-                "gw_details": {
-                    "dgw_teams": stats["dgw_teams"],
-                    "blank_teams": stats["blank_teams"],
-                    "fixture_count": stats["fixture_count"],
-                    "avg_fdr": stats["avg_fdr"],
-                },
-            })
+            recommendations.append(
+                {
+                    "chip": "Free Hit",
+                    "chip_code": "freehit",
+                    "recommended_gameweek": best_fh_gw,
+                    "confidence_score": round(best_fh_score, 1),
+                    "reasoning": ". ".join(reasoning_parts) + ".",
+                    "gw_details": {
+                        "dgw_teams": stats["dgw_teams"],
+                        "blank_teams": stats["blank_teams"],
+                        "fixture_count": stats["fixture_count"],
+                        "avg_fdr": stats["avg_fdr"],
+                    },
+                }
+            )
 
     # --- WILDCARD ---
     if "wildcard" in chips_remaining:
@@ -353,9 +351,7 @@ async def get_chip_strategy(team_id: int) -> dict:
                 score += bad_form_tough_fixture * 5.0
 
             # Injured/doubtful players increase wildcard need
-            injured_count = sum(
-                1 for p in squad_players if p.get("status") in INJURY_STATUSES
-            )
+            injured_count = sum(1 for p in squad_players if p.get("status") in INJURY_STATUSES)
             score += injured_count * 3.0
 
             # Prefer wildcarding before a good fixture swing
@@ -384,17 +380,11 @@ async def get_chip_strategy(team_id: int) -> dict:
             for player in squad_players:
                 form = float(player.get("form") or 0)
                 player_fixes = fmap.get(player["team"], [])
-                avg_fdr = (
-                    sum(f["fdr"] for f in player_fixes) / len(player_fixes)
-                    if player_fixes else 3.0
-                )
+                avg_fdr = sum(f["fdr"] for f in player_fixes) / len(player_fixes) if player_fixes else 3.0
                 if form <= 3.0 and avg_fdr >= 3.5:
                     troubled_players.append(player["web_name"])
 
-            injured = [
-                p["web_name"] for p in squad_players
-                if p.get("status") in INJURY_STATUSES
-            ]
+            injured = [p["web_name"] for p in squad_players if p.get("status") in INJURY_STATUSES]
 
             reasoning_parts = []
             if troubled_players:
@@ -403,27 +393,27 @@ async def get_chip_strategy(team_id: int) -> dict:
                     f"({', '.join(troubled_players[:4])})"
                 )
             if injured:
-                reasoning_parts.append(
-                    f"{len(injured)} injured/doubtful ({', '.join(injured[:3])})"
-                )
+                reasoning_parts.append(f"{len(injured)} injured/doubtful ({', '.join(injured[:3])})")
             reasoning_parts.append("good fixture swings available for replacements")
 
-            recommendations.append({
-                "chip": "Wildcard",
-                "chip_code": "wildcard",
-                "recommended_gameweek": best_wc_gw,
-                "confidence_score": round(best_wc_score, 1),
-                "reasoning": ". ".join(reasoning_parts) + ".",
-                "squad_issues": {
-                    "poor_form_tough_fixtures": troubled_players,
-                    "injured_or_doubtful": injured,
-                },
-                "gw_details": {
-                    "dgw_teams": stats["dgw_teams"],
-                    "fixture_count": stats["fixture_count"],
-                    "avg_fdr": stats["avg_fdr"],
-                },
-            })
+            recommendations.append(
+                {
+                    "chip": "Wildcard",
+                    "chip_code": "wildcard",
+                    "recommended_gameweek": best_wc_gw,
+                    "confidence_score": round(best_wc_score, 1),
+                    "reasoning": ". ".join(reasoning_parts) + ".",
+                    "squad_issues": {
+                        "poor_form_tough_fixtures": troubled_players,
+                        "injured_or_doubtful": injured,
+                    },
+                    "gw_details": {
+                        "dgw_teams": stats["dgw_teams"],
+                        "fixture_count": stats["fixture_count"],
+                        "avg_fdr": stats["avg_fdr"],
+                    },
+                }
+            )
 
     # Sort recommendations by confidence
     recommendations.sort(key=lambda r: r["confidence_score"], reverse=True)
@@ -434,8 +424,7 @@ async def get_chip_strategy(team_id: int) -> dict:
         "scan_window": f"GW{next_gw}-GW{scan_gws[-1]}" if scan_gws else "N/A",
         "chips_remaining": [CHIP_DISPLAY.get(c, c) for c in chips_remaining],
         "chips_used": [
-            {"chip": CHIP_DISPLAY.get(c["name"], c["name"]), "gameweek": c["event"]}
-            for c in chips_used_list
+            {"chip": CHIP_DISPLAY.get(c["name"], c["name"]), "gameweek": c["event"]} for c in chips_used_list
         ],
         "recommendations": recommendations,
     }

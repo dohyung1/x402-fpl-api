@@ -13,9 +13,11 @@ import asyncio
 from app.fpl_client import (
     get_bootstrap,
     get_current_gameweek,
-    get_live_points as fpl_live,
-    get_team_picks,
     get_team_history,
+    get_team_picks,
+)
+from app.fpl_client import (
+    get_live_points as fpl_live,
 )
 
 POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
@@ -102,9 +104,7 @@ async def get_live_points(team_id: int) -> dict:
                     break
 
     # GW rank estimate: compare to current average points
-    gw_event = next(
-        (e for e in bootstrap["events"] if e["id"] == current_gw), {}
-    )
+    gw_event = next((e for e in bootstrap["events"] if e["id"] == current_gw), {})
     avg_points = gw_event.get("average_entry_score", 50)
     points_vs_avg = total_live - avg_points
 
@@ -116,9 +116,7 @@ async def get_live_points(team_id: int) -> dict:
         "gameweek_average": avg_points,
         "points_vs_average": round(points_vs_avg, 1),
         "rank_estimate": (
-            "Above average" if points_vs_avg > 5
-            else "Average" if points_vs_avg >= -5
-            else "Below average"
+            "Above average" if points_vs_avg > 5 else "Average" if points_vs_avg >= -5 else "Below average"
         ),
         "starters": starter_data,
         "bench": bench_data,

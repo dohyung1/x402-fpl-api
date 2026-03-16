@@ -17,10 +17,10 @@ import asyncio
 
 from app.fpl_client import (
     get_bootstrap,
+    get_current_gameweek,
     get_fixtures,
     get_next_gameweek,
     get_team_picks,
-    get_current_gameweek,
 )
 
 POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
@@ -89,12 +89,14 @@ async def get_squad_scout(team_id: int) -> dict:
             if is_starter:
                 for r in risks:
                     if "blank" in r.get("property", "").lower() or "no" in r.get("notes", "").lower():
-                        blank_warnings.append({
-                            "name": p["web_name"],
-                            "team": team.get("short_name", "?"),
-                            "note": r.get("notes", ""),
-                            "gameweek": r.get("gameweek"),
-                        })
+                        blank_warnings.append(
+                            {
+                                "name": p["web_name"],
+                                "team": team.get("short_name", "?"),
+                                "note": r.get("notes", ""),
+                                "gameweek": r.get("gameweek"),
+                            }
+                        )
 
         # Set piece duties
         corners_order = p.get("corners_and_indirect_freekicks_order")
@@ -108,23 +110,27 @@ async def get_squad_scout(team_id: int) -> dict:
                 duties.append("corners")
             if fk_order == 1:
                 duties.append("direct free kicks")
-            set_piece_takers.append({
-                "name": p["web_name"],
-                "team": team.get("short_name", "?"),
-                "duties": duties,
-                "in_squad": True,
-                "starter": is_starter,
-            })
+            set_piece_takers.append(
+                {
+                    "name": p["web_name"],
+                    "team": team.get("short_name", "?"),
+                    "duties": duties,
+                    "in_squad": True,
+                    "starter": is_starter,
+                }
+            )
 
         # Yellow card suspension risk (4 yellows = 1 match ban in PL)
         yellows = p.get("yellow_cards", 0)
         if yellows >= 4:
-            yellow_card_risks.append({
-                "name": p["web_name"],
-                "team": team.get("short_name", "?"),
-                "yellow_cards": yellows,
-                "risk": "1-match ban imminent" if yellows == 4 else f"{yellows} yellows",
-            })
+            yellow_card_risks.append(
+                {
+                    "name": p["web_name"],
+                    "team": team.get("short_name", "?"),
+                    "yellow_cards": yellows,
+                    "risk": "1-match ban imminent" if yellows == 4 else f"{yellows} yellows",
+                }
+            )
 
         # ICT breakdown
         player_info["ict"] = {
@@ -142,9 +148,9 @@ async def get_squad_scout(team_id: int) -> dict:
         player_info["dreamteam_count"] = p.get("dreamteam_count", 0)
         player_info["cost"] = p["now_cost"] / 10
         player_info["total_points"] = p.get("total_points", 0)
-        player_info["points_per_million"] = round(
-            p.get("total_points", 0) / (p["now_cost"] / 10), 1
-        ) if p["now_cost"] > 0 else 0
+        player_info["points_per_million"] = (
+            round(p.get("total_points", 0) / (p["now_cost"] / 10), 1) if p["now_cost"] > 0 else 0
+        )
 
         # Defensive stats (for DEF/GKP)
         if p["element_type"] in (1, 2):
@@ -162,9 +168,7 @@ async def get_squad_scout(team_id: int) -> dict:
     best_ep_next.sort(key=lambda x: x[0], reverse=True)
 
     # Find the current captain
-    current_captain = next(
-        (p for p in squad_report if p.get("is_captain")), None
-    )
+    current_captain = next((p for p in squad_report if p.get("is_captain")), None)
 
     # Captain suggestion based on FPL's own ep_next
     ep_captain_suggestion = None
@@ -201,15 +205,17 @@ async def get_squad_scout(team_id: int) -> dict:
                 duties.append("direct free kicks")
             ep = float(p.get("ep_next") or 0)
             if ep >= 3.0:  # only show high-EP targets
-                external_set_piece.append({
-                    "name": p["web_name"],
-                    "team": team.get("short_name", "?"),
-                    "position": POSITION_MAP.get(p["element_type"], "?"),
-                    "cost": p["now_cost"] / 10,
-                    "ep_next": ep,
-                    "duties": duties,
-                    "ownership": float(p.get("selected_by_percent") or 0),
-                })
+                external_set_piece.append(
+                    {
+                        "name": p["web_name"],
+                        "team": team.get("short_name", "?"),
+                        "position": POSITION_MAP.get(p["element_type"], "?"),
+                        "cost": p["now_cost"] / 10,
+                        "ep_next": ep,
+                        "duties": duties,
+                        "ownership": float(p.get("selected_by_percent") or 0),
+                    }
+                )
 
     external_set_piece.sort(key=lambda x: x["ep_next"], reverse=True)
 
@@ -230,8 +236,7 @@ async def get_squad_scout(team_id: int) -> dict:
             "yellow_card_risks": yellow_card_risks,
         },
         "summary": _build_summary(
-            blank_warnings, ep_captain_suggestion, set_piece_takers,
-            yellow_card_risks, best_ep_next
+            blank_warnings, ep_captain_suggestion, set_piece_takers, yellow_card_risks, best_ep_next
         ),
     }
 

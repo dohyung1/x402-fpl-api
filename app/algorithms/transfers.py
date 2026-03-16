@@ -14,8 +14,8 @@ Uses NEXT gameweek by default (what managers are prepping for).
 
 import asyncio
 
-from app.fpl_client import get_bootstrap, get_next_gameweek, get_fixtures, get_team_picks
 from app.algorithms.captain import _build_fixture_map
+from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek, get_team_picks
 
 POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
 
@@ -72,6 +72,7 @@ async def get_transfer_suggestions(
     except Exception:
         # Fall back to current GW picks if next GW picks aren't available yet
         from app.fpl_client import get_current_gameweek
+
         current_gw = get_current_gameweek(bootstrap)
         try:
             picks_data = await get_team_picks(team_id, current_gw)
