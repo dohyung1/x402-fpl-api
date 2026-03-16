@@ -7,27 +7,47 @@ Given a team's current squad, suggest transfers in/out based on:
   - Price change predictions (buy before a rise)
   - Squad gaps by position
   - Budget constraints
+
+DGW support: scores players against all their fixtures in the gameweek.
+Uses NEXT gameweek by default (what managers are prepping for).
 """
 
 import asyncio
 
-from app.fpl_client import get_bootstrap, get_current_gameweek, get_fixtures, get_team_picks
+from app.fpl_client import get_bootstrap, get_next_gameweek, get_fixtures, get_team_picks
 from app.algorithms.captain import _build_fixture_map
 
 POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
 
 
-def _player_value_score(player: dict, fixture: dict | None) -> float:
-    """Score a player's transfer value: form + PPG - FDR."""
+def _player_value_score(player: dict, fixtures: list[dict] | None) -> float:
+    """Score a player's transfer value: form + PPG - FDR (DGW-aware)."""
     form = float(player.get("form") or 0)
     ppg = float(player.get("points_per_game") or 0)
-    fdr = fixture["fdr"] if fixture else 3
-    is_home = fixture.get("is_home", False) if fixture else False
 
-    score = form * 2.0 + ppg * 1.0 - fdr * 1.0 + (0.5 if is_home else 0)
+    if fixtures:
+        # Sum fixture contributions across all fixtures (DGW support)
+        fixture_score = 0.0
+        for fix in fixtures:
+            fdr = fix["fdr"]
+            is_home = fix.get("is_home", False)
+            fixture_score += -fdr * 1.0 + (0.5 if is_home else 0)
+        # DGW bonus: more fixtures = more points potential
+        fixture_score += max(0, len(fixtures) - 1) * 2.0
+    else:
+        fixture_score = -3.0
+
+    score = form * 2.0 + ppg * 1.0 + fixture_score
     if player.get("status") in {"i", "d", "s", "u"}:
         score -= 5
     return round(score, 2)
+
+
+def _first_fixture(fixtures: list[dict] | None) -> dict | None:
+    """Return the first fixture dict for backward-compat, or None."""
+    if fixtures and len(fixtures) > 0:
+        return fixtures[0]
+    return None
 
 
 async def get_transfer_suggestions(
@@ -41,18 +61,26 @@ async def get_transfer_suggestions(
     team_id: FPL manager's team ID
     free_transfers: how many free transfers available (1 or 2)
     bank_m: bank balance in millions (e.g. 1.5)
+
+    Uses NEXT gameweek by default (what managers are prepping for).
     """
     bootstrap, fixtures = await asyncio.gather(get_bootstrap(), get_fixtures())
-    current_gw = get_current_gameweek(bootstrap)
+    next_gw = get_next_gameweek(bootstrap)
 
     try:
-        picks_data = await get_team_picks(team_id, current_gw)
+        picks_data = await get_team_picks(team_id, next_gw)
     except Exception:
-        return {"error": f"Could not fetch picks for team {team_id}. Check the team ID is correct."}
+        # Fall back to current GW picks if next GW picks aren't available yet
+        from app.fpl_client import get_current_gameweek
+        current_gw = get_current_gameweek(bootstrap)
+        try:
+            picks_data = await get_team_picks(team_id, current_gw)
+        except Exception:
+            return {"error": f"Could not fetch picks for team {team_id}. Check the team ID is correct."}
 
     players_by_id = {p["id"]: p for p in bootstrap["elements"]}
     teams = {t["id"]: t for t in bootstrap["teams"]}
-    fixture_map = _build_fixture_map(fixtures, current_gw)
+    fixture_map = _build_fixture_map(fixtures, next_gw)
 
     # Current squad
     squad = []
@@ -60,8 +88,9 @@ async def get_transfer_suggestions(
         p = players_by_id.get(pick["element"])
         if not p:
             continue
-        fixture = fixture_map.get(p["team"])
-        score = _player_value_score(p, fixture)
+        player_fixtures = fixture_map.get(p["team"])
+        score = _player_value_score(p, player_fixtures)
+        first_fix = _first_fixture(player_fixtures)
         squad.append(
             {
                 "id": p["id"],
@@ -74,11 +103,12 @@ async def get_transfer_suggestions(
                 "ppg": float(p.get("points_per_game") or 0),
                 "status": p.get("status", "a"),
                 "value_score": score,
-                "fixture": fixture,
+                "fixture": first_fix,
+                "fixtures": player_fixtures,
             }
         )
 
-    # Sort squad by value score ascending — worst candidates to sell first
+    # Sort squad by value score ascending -- worst candidates to sell first
     squad.sort(key=lambda x: x["value_score"])
     transfer_out_candidates = squad[: min(free_transfers, len(squad))]
 
@@ -101,9 +131,10 @@ async def get_transfer_suggestions(
             # Don't suggest players already in squad
             if p["id"] in {s["id"] for s in squad}:
                 continue
-            fixture = fixture_map.get(p["team"])
-            score = _player_value_score(p, fixture)
+            player_fixtures = fixture_map.get(p["team"])
+            score = _player_value_score(p, player_fixtures)
             if score > sell["value_score"]:
+                first_fix = _first_fixture(player_fixtures)
                 replacements.append(
                     {
                         "id": p["id"],
@@ -114,7 +145,7 @@ async def get_transfer_suggestions(
                         "form": float(p.get("form") or 0),
                         "ppg": float(p.get("points_per_game") or 0),
                         "value_score": score,
-                        "fixture": fixture,
+                        "fixture": first_fix,
                     }
                 )
 
@@ -139,7 +170,7 @@ async def get_transfer_suggestions(
 
     return {
         "team_id": team_id,
-        "gameweek": current_gw,
+        "gameweek": next_gw,
         "free_transfers": free_transfers,
         "bank_balance_m": bank_m,
         "transfer_suggestions": suggestions,
@@ -162,7 +193,8 @@ def _sell_reason(player: dict) -> str:
         reasons.append("poor form")
     if player["status"] in {"d", "i", "s"}:
         reasons.append("injury/suspension concern")
-    fdr = player["fixture"]["fdr"] if player["fixture"] else 3
+    fixture = player.get("fixture")
+    fdr = fixture["fdr"] if fixture else 3
     if fdr >= 4:
         reasons.append("tough upcoming fixture (FDR %d)" % fdr)
     if not reasons:

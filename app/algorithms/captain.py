@@ -1,45 +1,72 @@
 """
-Captain Pick algorithm.
+Captain Pick algorithm v2.
 
-captain_score =
-    form × 2.0
-  + points_per_game × 1.0
-  + home_bonus (1.5 if home, else 0)
-  - fixture_difficulty × 1.0   (FDR 1–5)
-  + ict_index × 0.01
-  + bonus_per_game × 0.5
-  - injury_penalty (0 if fit, -10 if doubtful/injured)
+captain_score_v2 =
+    xG_per_90 * 5.0              # expected goals per 90 (strongest signal)
+  + xA_per_90 * 3.0              # expected assists per 90
+  + form * 1.5                   # reduced from 2.0 -- form is noisy
+  + points_per_game * 1.0        # keep
+  + home_bonus (1.5 if home)     # keep
+  - fixture_difficulty * 1.0     # keep FDR
+  + ict_index * 0.01             # keep
+  + bonus_per_game * 0.5         # keep
+  + penalty_taker_bonus * 2.0    # 2.0 if penalties_order == 1
+  + minutes_certainty * 1.0      # starts / possible_starts
+  - playing_chance_penalty        # use chance_of_playing (0 if 100%, -10 if 0%, scaled)
 """
 
-from app.fpl_client import get_bootstrap, get_current_gameweek, get_fixtures
+from app.fpl_client import get_bootstrap, get_next_gameweek, get_fixtures
 
 # Statuses that warrant a full injury penalty
 INJURY_STATUSES = {"i", "d", "s", "u"}  # injured, doubtful, suspended, unavailable
 
 WEIGHTS = {
-    "form": 2.0,
+    "xg90": 5.0,
+    "xa90": 3.0,
+    "form": 1.5,
     "ppg": 1.0,
     "home": 1.5,
     "fdr": 1.0,
     "ict": 0.01,
     "bonus_pg": 0.5,
-    "injury": -10.0,
+    "penalty": 2.0,
+    "minutes_cert": 1.0,
+    "playing_chance_max_penalty": -10.0,
 }
 
 POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
 
 
-def _injury_penalty(player: dict) -> float:
-    status = player.get("status", "a")
-    return WEIGHTS["injury"] if status in INJURY_STATUSES else 0.0
+def _playing_chance_penalty(player: dict) -> float:
+    """
+    Penalise players unlikely to play next round.
+
+    chance_of_playing_next_round:
+      100 or None (fit) -> 0 penalty
+      75 -> -2.5
+      50 -> -5.0
+      25 -> -7.5
+      0  -> -10.0
+    """
+    chance = player.get("chance_of_playing_next_round")
+    if chance is None:
+        # No flag = assumed fit
+        status = player.get("status", "a")
+        if status in INJURY_STATUSES:
+            return WEIGHTS["playing_chance_max_penalty"]
+        return 0.0
+    chance = float(chance)
+    return WEIGHTS["playing_chance_max_penalty"] * (1.0 - chance / 100.0)
 
 
-def _build_fixture_map(fixtures: list, gameweek: int) -> dict[int, dict]:
+def _build_fixture_map(fixtures: list, gameweek: int) -> dict[int, list[dict]]:
     """
-    Map team_id → next fixture details for the given gameweek.
-    Returns: { team_id: { fdr, is_home, opponent_team } }
+    Map team_id -> list of fixture details for the given gameweek.
+    Returns: { team_id: [ { fdr, is_home, opponent_team }, ... ] }
+
+    Supports double gameweeks (DGW) where a team plays multiple fixtures.
     """
-    fixture_map: dict[int, dict] = {}
+    fixture_map: dict[int, list[dict]] = {}
     gw_fixtures = [f for f in fixtures if f.get("event") == gameweek]
 
     for fix in gw_fixtures:
@@ -49,44 +76,88 @@ def _build_fixture_map(fixtures: list, gameweek: int) -> dict[int, dict]:
         away_fdr = fix["team_a_difficulty"]
 
         # Home team
-        if home_id not in fixture_map:
-            fixture_map[home_id] = {"fdr": home_fdr, "is_home": True, "opponent": away_id}
+        fixture_map.setdefault(home_id, []).append(
+            {"fdr": home_fdr, "is_home": True, "opponent": away_id}
+        )
         # Away team
-        if away_id not in fixture_map:
-            fixture_map[away_id] = {"fdr": away_fdr, "is_home": False, "opponent": home_id}
+        fixture_map.setdefault(away_id, []).append(
+            {"fdr": away_fdr, "is_home": False, "opponent": home_id}
+        )
 
     return fixture_map
 
 
-def _score_player(player: dict, fixture: dict | None) -> float:
+def _score_player(player: dict, fixtures: list[dict] | None) -> float:
+    """
+    Score a player for captaincy using v2 algorithm with xG/xA data.
+
+    fixtures: list of fixture dicts for the player's team this gameweek.
+              Supports DGWs (multiple fixtures) by summing fixture-dependent
+              components across all fixtures.
+    """
     form = float(player.get("form") or 0)
     ppg = float(player.get("points_per_game") or 0)
     ict = float(player.get("ict_index") or 0)
 
-    # bonus_per_game approximation: total bonus / GW played
+    # xG and xA per 90
     minutes = player.get("minutes", 0)
-    gw_played = max(1, round(minutes / 90))
+    nineties = minutes / 90.0 if minutes > 0 else 0
+
+    xg_per_90 = 0.0
+    xa_per_90 = 0.0
+    if nineties > 0:
+        xg = float(player.get("expected_goals") or 0)
+        xa = float(player.get("expected_assists") or 0)
+        xg_per_90 = xg / nineties
+        xa_per_90 = xa / nineties
+
+    # bonus_per_game approximation: total bonus / 90s played
+    gw_played = max(1, round(nineties)) if nineties > 0 else 1
     bonus_pg = player.get("bonus", 0) / gw_played
 
-    fdr = fixture["fdr"] if fixture else 3  # assume average difficulty if no fixture
-    is_home = fixture["is_home"] if fixture else False
+    # Penalty taker bonus
+    penalties_order = player.get("penalties_order")
+    penalty_bonus = WEIGHTS["penalty"] if penalties_order == 1 else 0.0
 
-    home_bonus = WEIGHTS["home"] if is_home else 0.0
-    injury_penalty = _injury_penalty(player)
+    # Minutes certainty: starts / possible starts (approximate from GWs played)
+    starts = player.get("starts", 0)
+    # Count gameweeks where player could have started (events so far)
+    possible_starts = max(1, gw_played)
+    minutes_cert = starts / possible_starts if possible_starts > 0 else 0.0
 
-    score = (
-        form * WEIGHTS["form"]
+    # Playing chance penalty (uses chance_of_playing_next_round or status)
+    chance_penalty = _playing_chance_penalty(player)
+
+    # Base score (fixture-independent)
+    base_score = (
+        xg_per_90 * WEIGHTS["xg90"]
+        + xa_per_90 * WEIGHTS["xa90"]
+        + form * WEIGHTS["form"]
         + ppg * WEIGHTS["ppg"]
-        + home_bonus
-        - fdr * WEIGHTS["fdr"]
         + ict * WEIGHTS["ict"]
         + bonus_pg * WEIGHTS["bonus_pg"]
-        + injury_penalty
+        + penalty_bonus
+        + minutes_cert * WEIGHTS["minutes_cert"]
+        + chance_penalty
     )
+
+    # Fixture-dependent scoring -- sum across all fixtures (DGW support)
+    if fixtures:
+        fixture_score = 0.0
+        for fixture in fixtures:
+            fdr = fixture["fdr"]
+            is_home = fixture["is_home"]
+            home_bonus = WEIGHTS["home"] if is_home else 0.0
+            fixture_score += home_bonus - fdr * WEIGHTS["fdr"]
+        score = base_score + fixture_score
+    else:
+        # No fixture data -- assume average difficulty
+        score = base_score - 3 * WEIGHTS["fdr"]
+
     return round(score, 3)
 
 
-def _build_reasoning(player: dict, fixture: dict | None, score: float) -> str:
+def _build_reasoning(player: dict, fixtures: list[dict] | None, score: float) -> str:
     parts = []
     form = float(player.get("form") or 0)
     if form >= 7:
@@ -96,18 +167,43 @@ def _build_reasoning(player: dict, fixture: dict | None, score: float) -> str:
     elif form <= 2:
         parts.append("poor form")
 
-    if fixture:
-        fdr = fixture["fdr"]
-        if fdr <= 2:
-            parts.append("easy fixture (FDR %d)" % fdr)
-        elif fdr >= 4:
-            parts.append("tough fixture (FDR %d)" % fdr)
-        if fixture["is_home"]:
-            parts.append("home advantage")
+    # xG/xA insight
+    minutes = player.get("minutes", 0)
+    if minutes > 0:
+        nineties = minutes / 90.0
+        xg = float(player.get("expected_goals") or 0)
+        xa = float(player.get("expected_assists") or 0)
+        xg90 = xg / nineties if nineties > 0 else 0
+        xa90 = xa / nineties if nineties > 0 else 0
+        if xg90 >= 0.5:
+            parts.append(f"elite xG/90 ({xg90:.2f})")
+        elif xg90 >= 0.3:
+            parts.append(f"strong xG/90 ({xg90:.2f})")
+        if xa90 >= 0.3:
+            parts.append(f"strong xA/90 ({xa90:.2f})")
 
+    if player.get("penalties_order") == 1:
+        parts.append("on penalties")
+
+    if fixtures:
+        if len(fixtures) > 1:
+            parts.append(f"double gameweek ({len(fixtures)} fixtures)")
+        for fixture in fixtures:
+            fdr = fixture["fdr"]
+            if fdr <= 2:
+                parts.append("easy fixture (FDR %d)" % fdr)
+            elif fdr >= 4:
+                parts.append("tough fixture (FDR %d)" % fdr)
+            if fixture["is_home"]:
+                parts.append("home advantage")
+
+    chance = player.get("chance_of_playing_next_round")
     status = player.get("status", "a")
     if status in INJURY_STATUSES:
-        parts.append("⚠ injury concern")
+        if chance is not None:
+            parts.append(f"injury concern ({chance}% chance)")
+        else:
+            parts.append("injury concern")
 
     ict = float(player.get("ict_index") or 0)
     if ict >= 150:
@@ -122,32 +218,56 @@ def _build_reasoning(player: dict, fixture: dict | None, score: float) -> str:
 async def get_captain_picks(gameweek: int | None = None, top_n: int = 5) -> dict:
     """
     Return top N captain recommendations for the given gameweek.
-    If gameweek is None, uses the current/next gameweek.
+    If gameweek is None, uses the next gameweek (what managers are prepping for).
     """
     bootstrap, fixtures = await _gather_data()
 
     if gameweek is None:
-        gameweek = get_current_gameweek(bootstrap)
+        gameweek = get_next_gameweek(bootstrap)
 
     teams = {t["id"]: t for t in bootstrap["teams"]}
     fixture_map = _build_fixture_map(fixtures, gameweek)
 
     scored = []
     for player in bootstrap["elements"]:
-        # Only consider premium attacking assets for captaincy
-        # (all positions included, but ranked — GKPs will score low naturally)
-        fixture = fixture_map.get(player["team"])
-        score = _score_player(player, fixture)
-        scored.append((score, player, fixture))
+        player_fixtures = fixture_map.get(player["team"])
+        score = _score_player(player, player_fixtures)
+        scored.append((score, player, player_fixtures))
 
     scored.sort(key=lambda x: x[0], reverse=True)
     top = scored[:top_n]
 
     picks = []
-    for score, player, fixture in top:
+    for score, player, player_fixtures in top:
         team = teams.get(player["team"], {})
-        opponent_id = fixture["opponent"] if fixture else None
-        opponent = teams.get(opponent_id, {}).get("short_name", "?") if opponent_id else "?"
+
+        # Build fixture info for all fixtures (DGW support)
+        fixture_info = None
+        if player_fixtures:
+            fixture_entries = []
+            for fix in player_fixtures:
+                opponent_id = fix["opponent"]
+                opponent = teams.get(opponent_id, {}).get("short_name", "?")
+                fixture_entries.append({
+                    "opponent": opponent,
+                    "venue": "Home" if fix["is_home"] else "Away",
+                    "fdr": fix["fdr"],
+                })
+            fixture_info = {
+                "fixtures": fixture_entries,
+                "gameweek": gameweek,
+                "is_dgw": len(fixture_entries) > 1,
+                # Keep backward compat: top-level opponent/venue/fdr from first fixture
+                "opponent": fixture_entries[0]["opponent"],
+                "venue": fixture_entries[0]["venue"],
+                "fdr": fixture_entries[0]["fdr"],
+            }
+
+        # xG/xA stats
+        minutes = player.get("minutes", 0)
+        nineties = minutes / 90.0 if minutes > 0 else 0
+        xg = float(player.get("expected_goals") or 0)
+        xa = float(player.get("expected_assists") or 0)
 
         picks.append(
             {
@@ -161,29 +281,30 @@ async def get_captain_picks(gameweek: int | None = None, top_n: int = 5) -> dict
                     "selected_by_pct": float(player.get("selected_by_percent") or 0),
                     "status": player.get("status", "a"),
                 },
-                "fixture": {
-                    "opponent": opponent,
-                    "venue": "Home" if (fixture and fixture["is_home"]) else "Away",
-                    "fdr": fixture["fdr"] if fixture else None,
-                    "gameweek": gameweek,
-                }
-                if fixture
-                else None,
+                "fixture": fixture_info,
                 "score": score,
-                "reasoning": _build_reasoning(player, fixture, score),
+                "reasoning": _build_reasoning(player, player_fixtures, score),
                 "stats": {
                     "form": float(player.get("form") or 0),
                     "points_per_game": float(player.get("points_per_game") or 0),
                     "ict_index": float(player.get("ict_index") or 0),
                     "total_points": player.get("total_points", 0),
                     "bonus": player.get("bonus", 0),
+                    "expected_goals": xg,
+                    "expected_assists": xa,
+                    "expected_goal_involvements": float(player.get("expected_goal_involvements") or 0),
+                    "xg_per_90": round(xg / nineties, 3) if nineties > 0 else 0,
+                    "xa_per_90": round(xa / nineties, 3) if nineties > 0 else 0,
+                    "penalties_order": player.get("penalties_order"),
+                    "starts": player.get("starts", 0),
+                    "chance_of_playing": player.get("chance_of_playing_next_round"),
                 },
             }
         )
 
     return {
         "gameweek": gameweek,
-        "algorithm_version": "1.0",
+        "algorithm_version": "2.0",
         "picks": picks,
     }
 

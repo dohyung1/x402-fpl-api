@@ -17,3 +17,6 @@ wheels/
 
 # Test cache
 .pytest_cache/
+
+# SQLite payment database
+data/
