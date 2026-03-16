@@ -8,6 +8,7 @@ Cache TTL defaults to 5 minutes (configurable via FPL_CACHE_TTL_SECONDS).
 During live matches, callers that need fresh data should pass ttl=0.
 """
 
+import asyncio
 import logging
 import time
 from typing import Any
@@ -15,6 +16,9 @@ from typing import Any
 import httpx
 
 from app.config import settings
+
+MAX_RETRIES = 2
+RETRY_DELAY = 1.0  # seconds
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +42,23 @@ async def _fetch(path: str, ttl: int | None = None) -> Any:
         if now < expires_at:
             return data
 
-    async with httpx.AsyncClient(headers=HEADERS, timeout=10.0) as client:
-        resp = await client.get(url)
-        resp.raise_for_status()
-        data = resp.json()
+    last_exc = None
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            async with httpx.AsyncClient(headers=HEADERS, timeout=10.0) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                data = resp.json()
+                break
+        except (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException) as exc:
+            last_exc = exc
+            if attempt < MAX_RETRIES:
+                logger.warning("FPL API attempt %d failed for %s: %s", attempt + 1, path, exc)
+                await asyncio.sleep(RETRY_DELAY * (attempt + 1))
+            else:
+                raise
+    else:
+        raise last_exc  # type: ignore[misc]
 
     if ttl > 0:
         _cache[url] = (data, now + ttl)

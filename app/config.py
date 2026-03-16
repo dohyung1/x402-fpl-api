@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     service_name: str = "x402-fpl-api"
     service_description: str = "AI-agent-native Fantasy Premier League intelligence"
 
+    # CORS
+    cors_origins: list[str] = ["*"]  # Override in .env: CORS_ORIGINS='["https://yourdomain.com"]'
+
     # FPL API
     fpl_base_url: str = "https://fantasy.premierleague.com/api"
     fpl_cache_ttl_seconds: int = 300  # 5 minutes
