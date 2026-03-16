@@ -331,5 +331,86 @@ async def fpl_manager_hub(
     }
 
 
+# ---------------------------------------------------------------------------
+# MCP Prompt Templates
+# Pre-built prompts that appear in Claude Desktop's prompt selector.
+# Help new users discover what the FPL Intelligence server can do.
+# ---------------------------------------------------------------------------
+
+
+@mcp.prompt()
+def analyze_my_fpl_team(team_id: str) -> str:
+    """Comprehensive analysis of an FPL manager's team — squad health, captain pick, transfers, fixtures, and price risks."""
+    return (
+        f"Use the fpl_manager_hub tool with team_id {team_id} to pull a full intelligence "
+        f"report for my FPL team. Then give me a comprehensive analysis covering:\n"
+        f"1. Squad health — any injured, doubtful, or poor-form starters I should worry about\n"
+        f"2. Captain recommendation — who should I captain and why\n"
+        f"3. Transfer priorities — which players should I sell and who are the best replacements\n"
+        f"4. Fixture outlook — which of my players have great or terrible upcoming fixtures\n"
+        f"5. Price change risks — am I about to lose value on anyone\n"
+        f"6. Overall verdict — a 1-paragraph summary of my team's state and the single most important action to take this gameweek"
+    )
+
+
+@mcp.prompt()
+def who_should_i_captain() -> str:
+    """Get captain pick recommendations with detailed reasoning for this gameweek."""
+    return (
+        "Use the captain_pick tool to get the top 5 captain recommendations for this gameweek. "
+        "Then explain the results to me in plain English:\n"
+        "- Who is the #1 pick and why?\n"
+        "- What makes them stand out (xG, fixtures, form, penalties)?\n"
+        "- Is there a high-risk high-reward differential captain option?\n"
+        "- Any injury flags or rotation risks I should be aware of?\n"
+        "Give me a clear final recommendation with your confidence level."
+    )
+
+
+@mcp.prompt()
+def find_differential_picks(max_ownership: str = "10") -> str:
+    """Find underowned gems that most FPL managers are missing."""
+    return (
+        f"Use the differential_finder tool with max_ownership_pct {max_ownership} to find "
+        f"underowned players who are outperforming their ownership. Then:\n"
+        f"- Highlight the top 3 differentials I should seriously consider\n"
+        f"- For each one, explain WHY they're flying under the radar\n"
+        f"- Rate their upcoming fixtures\n"
+        f"- Tell me if they're a short-term punt or a long-term hold\n"
+        f"- Flag any risks (rotation, tough fixtures coming, underlying stats not matching output)\n"
+        f"I want players that can give me a real rank boost."
+    )
+
+
+@mcp.prompt()
+def plan_my_transfers(team_id: str) -> str:
+    """Get transfer suggestions based on your current squad and upcoming fixtures."""
+    return (
+        f"Use the transfer_suggestions tool with team_id {team_id} to analyze my squad "
+        f"and suggest transfers. Then walk me through the plan:\n"
+        f"1. Who are the weakest links in my squad and why?\n"
+        f"2. What are the best replacements and what makes them better?\n"
+        f"3. Should I take a hit (-4 points) for an extra transfer or save it?\n"
+        f"4. Are any suggested transfers also good for upcoming fixture swings?\n"
+        f"5. Are any targets about to rise in price (buy now vs. wait)?\n"
+        f"Give me a clear action plan: exactly which transfers to make and in what order."
+    )
+
+
+@mcp.prompt()
+def price_change_alert() -> str:
+    """Check which players are about to rise or fall in price tonight."""
+    return (
+        "Use the price_predictions tool to check tonight's likely price changes. "
+        "Then give me a briefing:\n"
+        "- Which players are most likely to RISE in price tonight?\n"
+        "- Which players are most likely to FALL?\n"
+        "- Do I need to rush any transfers through before the price change?\n"
+        "- Are any of the risers worth buying even if I wasn't planning a transfer?\n"
+        "- Are any of the fallers players I should panic-sell?\n"
+        "Keep it actionable — tell me exactly what to do before tonight's deadline."
+    )
+
+
 if __name__ == "__main__":
     mcp.run()
