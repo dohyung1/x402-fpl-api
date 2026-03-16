@@ -23,16 +23,53 @@ Usage:
 """
 
 import asyncio
+import logging
 
 from mcp.server.fastmcp import FastMCP
 
-mcp = FastMCP("FPL Intelligence")
+logger = logging.getLogger("fpl-intelligence")
+
+mcp = FastMCP(
+    "FPL Intelligence",
+    instructions=(
+        "You are an expert Fantasy Premier League analyst. "
+        "Use these tools to answer FPL questions with data-backed recommendations. "
+        "Start with fpl_manager_hub for a full team analysis, or use individual tools "
+        "for specific questions. Always explain your reasoning in plain English."
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _error(message: str) -> dict:
+    """Return a structured error dict that MCP clients can detect via isError."""
+    return {"isError": True, "error": message}
+
+
+def _validate_team_id(team_id: int) -> str | None:
+    """Return an error message if team_id is invalid, else None."""
+    if not isinstance(team_id, int) or team_id < 1 or team_id > 20_000_000:
+        return "Invalid team_id. Must be a positive integer (find it in your FPL URL: fantasy.premierleague.com/entry/YOUR_ID/event/...)."
+    return None
+
+
+def _validate_gameweek(gw: int | None) -> str | None:
+    """Return an error message if gameweek is out of range, else None."""
+    if gw is not None and (not isinstance(gw, int) or gw < 1 or gw > 38):
+        return "Invalid gameweek. Must be between 1 and 38."
+    return None
 
 
 @mcp.tool()
 async def captain_pick(gameweek: int | None = None) -> dict:
     """
     Get top 5 captain recommendations for a given FPL gameweek.
+
+    USE THIS WHEN the user asks: "Who should I captain?", "Best captain this week?",
+    "Captain Salah or Haaland?", or any captain-related question.
 
     Each pick is scored by xG/90, xA/90, form, points per game, home advantage,
     fixture difficulty, ICT index, bonus rate, penalty duties, and minutes certainty.
@@ -41,9 +78,14 @@ async def captain_pick(gameweek: int | None = None) -> dict:
     Args:
         gameweek: Gameweek number (1-38). Defaults to next gameweek if not specified.
     """
-    from app.algorithms.captain import get_captain_picks
-
-    return await get_captain_picks(gameweek=gameweek)
+    if err := _validate_gameweek(gameweek):
+        return _error(err)
+    try:
+        from app.algorithms.captain import get_captain_picks
+        return await get_captain_picks(gameweek=gameweek)
+    except Exception as exc:
+        logger.exception("captain_pick failed")
+        return _error(f"Failed to get captain picks: {exc}")
 
 
 @mcp.tool()
@@ -54,16 +96,23 @@ async def differential_finder(
     """
     Find underowned FPL players who are outperforming their ownership percentage.
 
-    Great for gaining competitive edge -- surfaces players that most managers
-    don't have but are delivering strong returns.
+    USE THIS WHEN the user asks: "Find me a differential", "Who are the hidden gems?",
+    "Low-owned players performing well?", or wants to climb the rankings with unique picks.
 
     Args:
         max_ownership_pct: Only include players owned by fewer than this percentage. Default 10%.
         gameweek: Gameweek number (1-38). Defaults to next gameweek if not specified.
     """
-    from app.algorithms.differentials import get_differentials
-
-    return await get_differentials(max_ownership_pct=max_ownership_pct, gameweek=gameweek)
+    if err := _validate_gameweek(gameweek):
+        return _error(err)
+    if max_ownership_pct < 0.1 or max_ownership_pct > 100:
+        return _error("max_ownership_pct must be between 0.1 and 100.")
+    try:
+        from app.algorithms.differentials import get_differentials
+        return await get_differentials(max_ownership_pct=max_ownership_pct, gameweek=gameweek)
+    except Exception as exc:
+        logger.exception("differential_finder failed")
+        return _error(f"Failed to find differentials: {exc}")
 
 
 @mcp.tool()
@@ -74,17 +123,22 @@ async def fixture_outlook(
     """
     Rank all 20 Premier League teams by upcoming fixture difficulty.
 
-    Shows which teams have the easiest run of games coming up,
-    and surfaces the best players to target from those teams.
-    Essential for planning transfers 4-6 weeks ahead.
+    USE THIS WHEN the user asks: "Who has easy fixtures?", "Which teams to target?",
+    "Best defenders to buy for the next 5 weeks?", or any fixture-planning question.
 
     Args:
         gameweeks_ahead: How many gameweeks to look ahead (1-10). Default 5.
         position: Filter players by position: GKP, DEF, MID, or FWD. Optional.
     """
-    from app.algorithms.fixtures import get_fixture_outlook
-
-    return await get_fixture_outlook(gameweeks_ahead=gameweeks_ahead, position=position)
+    gameweeks_ahead = max(1, min(10, gameweeks_ahead))
+    if position and position.upper() not in ("GKP", "DEF", "MID", "FWD"):
+        return _error("Position must be one of: GKP, DEF, MID, FWD.")
+    try:
+        from app.algorithms.fixtures import get_fixture_outlook
+        return await get_fixture_outlook(gameweeks_ahead=gameweeks_ahead, position=position)
+    except Exception as exc:
+        logger.exception("fixture_outlook failed")
+        return _error(f"Failed to get fixture outlook: {exc}")
 
 
 @mcp.tool()
@@ -92,13 +146,17 @@ async def price_predictions() -> dict:
     """
     Predict which FPL players are likely to rise or fall in price tonight.
 
-    Based on net transfer volume trends. Buy before a rise to gain free
-    team value. Sell before a fall to avoid losing value.
-    Price changes happen overnight based on transfer activity.
-    """
-    from app.algorithms.prices import get_price_predictions
+    USE THIS WHEN the user asks: "Who's about to rise in price?", "Should I make my
+    transfer now before prices change?", "Price change predictions?", or any price-related question.
 
-    return await get_price_predictions()
+    Buy before a rise to gain free team value. Sell before a fall to avoid losing value.
+    """
+    try:
+        from app.algorithms.prices import get_price_predictions
+        return await get_price_predictions()
+    except Exception as exc:
+        logger.exception("price_predictions failed")
+        return _error(f"Failed to get price predictions: {exc}")
 
 
 @mcp.tool()
@@ -110,21 +168,26 @@ async def transfer_suggestions(
     """
     Get transfer recommendations for a specific FPL team.
 
-    Analyzes the current squad, identifies the weakest players based on
-    form and fixtures, and suggests replacements within budget.
+    USE THIS WHEN the user asks: "Who should I transfer in/out?", "Best transfers this week?",
+    "How to improve my team?". Prefer fpl_manager_hub for a full analysis instead.
 
     Args:
-        team_id: Your FPL team ID (find it in the URL when you view your team on the FPL website).
+        team_id: FPL team ID (the number in your FPL URL).
         free_transfers: Number of free transfers available (1 or 2). Default 1.
         bank: Money in the bank in millions (e.g. 1.5 means 1.5m). Default 0.0.
     """
-    from app.algorithms.transfers import get_transfer_suggestions
-
-    return await get_transfer_suggestions(
-        team_id=team_id,
-        free_transfers=free_transfers,
-        bank_m=bank,
-    )
+    if err := _validate_team_id(team_id):
+        return _error(err)
+    try:
+        from app.algorithms.transfers import get_transfer_suggestions
+        return await get_transfer_suggestions(
+            team_id=team_id,
+            free_transfers=max(1, min(5, free_transfers)),
+            bank_m=max(0.0, bank),
+        )
+    except Exception as exc:
+        logger.exception("transfer_suggestions failed")
+        return _error(f"Failed to get transfer suggestions: {exc}")
 
 
 @mcp.tool()
@@ -132,21 +195,30 @@ async def player_comparison(player_names: list[str], gameweeks_ahead: int = 5) -
     """
     Compare 2-4 FPL players head-to-head across all key metrics.
 
-    Give player names (e.g., "Salah", "Palmer", "Saka") and get a detailed
-    side-by-side breakdown: form, xG/90, xA/90, ICT index, points per game,
-    cost, ownership, captain score, upcoming fixtures with FDR, transfer
-    momentum, and value per million.
+    USE THIS WHEN the user asks: "Salah vs Palmer?", "Compare Haaland and Watkins",
+    "Which midfielder should I pick?", or any player comparison question.
 
-    Includes a verdict recommending the best pick with reasoning.
     Names are fuzzy-matched — partial names like "Salah" or "Palmer" work fine.
+    Returns form, xG/90, xA/90, ICT, PPG, cost, ownership, captain score,
+    upcoming fixtures, transfer momentum, and a verdict.
 
     Args:
         player_names: List of 2-4 player names to compare (e.g., ["Salah", "Palmer", "Saka"]).
         gameweeks_ahead: How many gameweeks of fixtures to include (1-10). Default 5.
     """
-    from app.algorithms.compare import compare_players
-
-    return await compare_players(player_names=player_names, gameweeks_ahead=gameweeks_ahead)
+    if not player_names or len(player_names) < 2:
+        return _error("Provide at least 2 player names to compare (max 4).")
+    if len(player_names) > 4:
+        return _error("Can compare at most 4 players at once.")
+    try:
+        from app.algorithms.compare import compare_players
+        return await compare_players(
+            player_names=player_names,
+            gameweeks_ahead=max(1, min(10, gameweeks_ahead)),
+        )
+    except Exception as exc:
+        logger.exception("player_comparison failed")
+        return _error(f"Failed to compare players: {exc}")
 
 
 @mcp.tool()
@@ -154,16 +226,21 @@ async def live_points(team_id: int) -> dict:
     """
     Get live points for a specific FPL team during an active gameweek.
 
-    Shows each player's live score, projected bonus points,
-    auto-sub scenarios if a starter didn't play, and how
-    the team compares to the gameweek average.
+    USE THIS WHEN the user asks: "How's my team doing?", "Live score?",
+    "Am I getting any bonus points?", "Any auto-subs?". Only useful during
+    an active gameweek when matches are being played or have just finished.
 
     Args:
-        team_id: Your FPL team ID (find it in the URL when you view your team on the FPL website).
+        team_id: FPL team ID (the number in your FPL URL).
     """
-    from app.algorithms.live import get_live_points
-
-    return await get_live_points(team_id=team_id)
+    if err := _validate_team_id(team_id):
+        return _error(err)
+    try:
+        from app.algorithms.live import get_live_points
+        return await get_live_points(team_id=team_id)
+    except Exception as exc:
+        logger.exception("live_points failed")
+        return _error(f"Failed to get live points: {exc}")
 
 
 @mcp.tool()
@@ -172,23 +249,32 @@ async def fpl_manager_hub(
     gameweeks_ahead: int = 5,
 ) -> dict:
     """
-    Complete FPL intelligence report for a manager's team.
+    Complete FPL intelligence report for a manager's team. THIS IS THE BEST STARTING POINT.
 
-    Given an FPL team ID, this tool automatically detects the manager's
-    bank balance, free transfers, chips used, and current squad -- then runs
-    every analysis: captain pick, transfer suggestions, fixture outlook,
-    differentials to target, price change risks, and squad health check.
+    USE THIS FIRST when the user provides their team ID or asks for a full analysis.
+    It auto-detects bank balance, free transfers, chips, and squad — then runs ALL
+    analyses in parallel: captain pick, transfers, fixtures, differentials, price risks,
+    and squad health.
 
-    The user does NOT need to provide bank balance or free transfers --
-    everything is auto-detected from the FPL API.
-
-    The team ID is the number in the FPL URL:
-    https://fantasy.premierleague.com/entry/<TEAM_ID>/event/30
+    The user only needs to provide their team ID (the number in their FPL URL:
+    fantasy.premierleague.com/entry/TEAM_ID/event/...).
 
     Args:
         team_id: FPL team ID from the manager's FPL URL.
         gameweeks_ahead: How many gameweeks to look ahead for fixture analysis (1-10). Default 5.
     """
+    if err := _validate_team_id(team_id):
+        return _error(err)
+    gameweeks_ahead = max(1, min(10, gameweeks_ahead))
+
+    try:
+        return await _fpl_manager_hub_impl(team_id, gameweeks_ahead)
+    except Exception as exc:
+        logger.exception("fpl_manager_hub failed for team %s", team_id)
+        return _error(f"Failed to analyze team {team_id}. Check that the team ID is correct and try again.")
+
+
+async def _fpl_manager_hub_impl(team_id: int, gameweeks_ahead: int) -> dict:
     from app.fpl_client import (
         get_bootstrap, get_fixtures, get_current_gameweek,
         get_next_gameweek, get_team_picks, get_team_history,
@@ -362,23 +448,31 @@ async def is_hit_worth_it(
     """
     Analyze whether taking a -4 point hit for a transfer is worth it.
 
-    Projects expected points for both players over the next N gameweeks,
-    accounting for form, fixture difficulty, home/away advantage, and
-    playing chance. If the incoming player's projected surplus exceeds
-    the 4-point cost, the hit is recommended.
+    USE THIS WHEN the user asks: "Should I take a hit?", "Is it worth -4 to bring in X?",
+    "Hit for Haaland worth it?". Use player_comparison first to find player IDs if needed.
+
+    Projects expected points for both players over N gameweeks, accounting for
+    form, fixture difficulty, home/away, and playing chance.
 
     Args:
-        player_out_id: FPL element ID of the player being sold.
+        player_out_id: FPL element ID of the player being sold (find via transfer_suggestions or player_comparison).
         player_in_id: FPL element ID of the player being bought.
         gameweeks_ahead: How many gameweeks to project over (1-10). Default 5.
     """
-    from app.algorithms.hit_analyzer import analyze_hit
-
-    return await analyze_hit(
-        player_out_id=player_out_id,
-        player_in_id=player_in_id,
-        gameweeks_ahead=gameweeks_ahead,
-    )
+    if player_out_id < 1 or player_in_id < 1:
+        return _error("Player IDs must be positive integers.")
+    if player_out_id == player_in_id:
+        return _error("player_out_id and player_in_id must be different players.")
+    try:
+        from app.algorithms.hit_analyzer import analyze_hit
+        return await analyze_hit(
+            player_out_id=player_out_id,
+            player_in_id=player_in_id,
+            gameweeks_ahead=max(1, min(10, gameweeks_ahead)),
+        )
+    except Exception as exc:
+        logger.exception("is_hit_worth_it failed")
+        return _error(f"Failed to analyze hit: {exc}")
 
 
 @mcp.tool()
@@ -386,21 +480,23 @@ async def chip_strategy(team_id: int) -> dict:
     """
     Recommend when to use each remaining FPL chip for maximum impact.
 
-    Scans the next 10 gameweeks to find the optimal timing for each
-    unused chip (Bench Boost, Triple Captain, Free Hit, Wildcard) based
-    on fixture difficulty, double/blank gameweeks, and squad health.
+    USE THIS WHEN the user asks: "When should I use my bench boost?", "Best week for
+    triple captain?", "Chip strategy?", "When to free hit?", "Should I wildcard?".
 
-    - Bench Boost: best when bench players have easy fixtures + DGW
-    - Triple Captain: best when top captain has easiest fixture + DGW
-    - Free Hit: best when many teams blank or huge fixture swings
-    - Wildcard: best when 4+ squad players have bad form + tough fixtures
+    Auto-detects which chips are still available (handles mid-season reset after GW19).
+    Scans the next 10 gameweeks and scores each for every unused chip.
 
     Args:
-        team_id: Your FPL team ID (find it in the URL when you view your team on the FPL website).
+        team_id: FPL team ID (the number in your FPL URL).
     """
-    from app.algorithms.chips import get_chip_strategy
-
-    return await get_chip_strategy(team_id=team_id)
+    if err := _validate_team_id(team_id):
+        return _error(err)
+    try:
+        from app.algorithms.chips import get_chip_strategy
+        return await get_chip_strategy(team_id=team_id)
+    except Exception as exc:
+        logger.exception("chip_strategy failed")
+        return _error(f"Failed to get chip strategy: {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -410,21 +506,70 @@ async def squad_scout(team_id: int) -> dict:
     """
     Deep scout report using FPL's hidden data fields most managers don't know about.
 
-    Surfaces insights you won't find in standard FPL tools:
-    - Blank gameweek warnings from FPL's own scout data
-    - FPL's expected points (ep_next) — their internal prediction for each player
-    - Set piece takers in your squad and transfer targets with set piece duties
-    - Yellow card suspension risks
-    - ICT breakdown (creativity vs influence vs threat)
-    - Points per million value rankings
-    - Captain suggestion based on FPL's own expected points model
+    USE THIS WHEN the user asks: "Any hidden insights?", "Set piece takers?",
+    "Suspension risks?", "What does FPL's own data say?", or for a deeper dive
+    beyond what fpl_manager_hub provides.
+
+    Surfaces: blank GW warnings, FPL's expected points (ep_next), set piece duties,
+    yellow card suspension risks, ICT breakdown, points per million rankings.
 
     Args:
-        team_id: Your FPL team ID.
+        team_id: FPL team ID (the number in your FPL URL).
     """
-    from app.algorithms.scout import get_squad_scout
+    if err := _validate_team_id(team_id):
+        return _error(err)
+    try:
+        from app.algorithms.scout import get_squad_scout
+        return await get_squad_scout(team_id=team_id)
+    except Exception as exc:
+        logger.exception("squad_scout failed")
+        return _error(f"Failed to scout squad: {exc}")
 
-    return await get_squad_scout(team_id=team_id)
+
+# ---------------------------------------------------------------------------
+# MCP Resources — static/reference data Claude can read as context
+# ---------------------------------------------------------------------------
+
+
+@mcp.resource("fpl://status")
+async def gameweek_status() -> str:
+    """Current FPL gameweek status — which GW is active, deadlines, and season progress."""
+    from app.fpl_client import get_bootstrap, get_current_gameweek, get_next_gameweek
+    import json
+
+    bootstrap = await get_bootstrap()
+    current_gw = get_current_gameweek(bootstrap)
+    next_gw = get_next_gameweek(bootstrap)
+
+    events = bootstrap.get("events", [])
+    current_event = next((e for e in events if e["id"] == current_gw), {})
+    next_event = next((e for e in events if e["id"] == next_gw), {})
+
+    finished_gws = sum(1 for e in events if e.get("finished"))
+
+    return json.dumps({
+        "current_gameweek": current_gw,
+        "next_gameweek": next_gw,
+        "current_gw_finished": current_event.get("finished", False),
+        "next_deadline": next_event.get("deadline_time", "unknown"),
+        "gameweeks_finished": finished_gws,
+        "gameweeks_remaining": 38 - finished_gws,
+        "season_progress_pct": round(finished_gws / 38 * 100, 1),
+    }, indent=2)
+
+
+@mcp.resource("fpl://teams")
+async def team_list() -> str:
+    """All 20 Premier League teams with short names and IDs."""
+    from app.fpl_client import get_bootstrap
+    import json
+
+    bootstrap = await get_bootstrap()
+    teams = [
+        {"id": t["id"], "name": t["name"], "short_name": t["short_name"]}
+        for t in sorted(bootstrap.get("teams", []), key=lambda t: t["name"])
+    ]
+    return json.dumps(teams, indent=2)
 
 
 # ---------------------------------------------------------------------------

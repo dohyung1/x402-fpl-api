@@ -54,21 +54,23 @@
 ## Sprint 2: Compete & Monetize (Next Week)
 
 ### Close Competitive Gaps
-- [ ] Publish to PyPI (`pip install fpl-intelligence`) — one-command install
+- [x] Publish to PyPI (`pip install fpl-intelligence`) — live at pypi.org/project/fpl-intelligence
 - [x] Add MCP prompt templates (5 prompts: analyze team, captain, differentials, transfers, price alerts)
 - [x] Captain weights v2.1 — backtest-tuned (PPG×3.0, form×2.5, FDR×2.0)
 - [x] Backtest script (`scripts/backtest.py`) — replay GWs, Haaland baseline, weight suggestions
 - [x] MIT LICENSE added
 - [ ] Add blank/double gameweek detection tool
-- [ ] Add player comparison tool
-- [ ] Add chip strategy advisor tool
-- [ ] Add "Is this hit worth it?" tool (unique, no competitor has this)
+- [x] Add player comparison tool
+- [x] Add chip strategy advisor tool
+- [x] Add "Is this hit worth it?" tool (unique, no competitor has this)
 
 ### Distribution Push
+- [x] Submit to Glama
+- [x] Submit to mcp.so
 - [ ] Submit to Smithery
 - [ ] Post on r/FantasyPL with accuracy data
 - [ ] Post on r/ClaudeAI
-- [ ] Rebrand MCP as "FPL Intelligence" (drop x402 from public-facing name)
+- [x] Rebrand MCP as "FPL Intelligence" (done — PyPI name, README, directory listings)
 
 ### Revenue Setup
 - [ ] Set up LemonSqueezy for season pass ($19.99/season)
