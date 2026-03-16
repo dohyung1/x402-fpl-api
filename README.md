@@ -1,5 +1,10 @@
 # FPL Intelligence — MCP Server
 
+[![PyPI version](https://img.shields.io/pypi/v/fpl-intelligence)](https://pypi.org/project/fpl-intelligence/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io)
+
 AI-powered Fantasy Premier League assistant for Claude Desktop. Get personalized captain picks, transfer suggestions, differentials, fixture analysis, price predictions, and live points — all from real FPL data.
 
 [![FPL Intelligence MCP server](https://glama.ai/mcp/servers/dohyung1/x402-fpl-api/badges/card.svg)](https://glama.ai/mcp/servers/dohyung1/x402-fpl-api)
@@ -69,3 +74,4 @@ https://fantasy.premierleague.com/entry/YOUR_TEAM_ID/event/<gw>
 | `fixture_outlook` | Teams ranked by upcoming fixture difficulty + best players to target |
 | `price_predictions` | Players likely to rise or fall in price tonight |
 | `live_points` | Live score, projected bonus, and auto-sub scenarios |
+| `squad_scout` | Deep scout using FPL's hidden data — expected points, blank GW warnings, set piece duties, suspension risks |
