@@ -95,9 +95,13 @@ async def get_chip_strategy(team_id: int) -> dict:
         get_team_history(team_id),
     )
 
-    # Determine chips remaining
+    # Determine chips remaining — FPL resets all chips at halfway (after GW19)
     chips_used_list = history_data.get("chips", [])
-    chips_used_names = {c["name"] for c in chips_used_list}
+    halfway_gw = 19
+    if current_gw > halfway_gw:
+        chips_used_names = {c["name"] for c in chips_used_list if c["event"] > halfway_gw}
+    else:
+        chips_used_names = {c["name"] for c in chips_used_list if c["event"] <= halfway_gw}
     chips_remaining = ALL_CHIPS - chips_used_names
 
     if not chips_remaining:
