@@ -72,7 +72,9 @@ async def health():
 
 
 @app.get("/api/fpl/captain-pick")
-async def captain_pick(gameweek: int | None = Query(None, description="Gameweek number (defaults to current)")):
+async def captain_pick(
+    gameweek: int | None = Query(None, ge=1, le=38, description="Gameweek number 1-38 (defaults to current)"),
+):
     """
     Top 5 captain recommendations for the given gameweek.
 
@@ -85,8 +87,8 @@ async def captain_pick(gameweek: int | None = Query(None, description="Gameweek 
 
 @app.get("/api/fpl/differentials")
 async def differentials(
-    max_ownership: float = Query(10.0, description="Max ownership % threshold (e.g. 10 = under 10%)"),
-    gameweek: int | None = Query(None, description="Gameweek number (defaults to current)"),
+    max_ownership: float = Query(10.0, ge=0.1, le=100, description="Max ownership % threshold (0.1-100)"),
+    gameweek: int | None = Query(None, ge=1, le=38, description="Gameweek number 1-38 (defaults to current)"),
 ):
     """
     Underowned players outperforming their ownership %.
