@@ -160,11 +160,19 @@ async def get_manager_status(team_id: int, bootstrap: dict) -> dict:
     else:
         free_transfers = 1
 
-    # Chips remaining
-    chips_used = {c["name"] for c in chips}
+    # Chips remaining — FPL resets all chips at the halfway point (after GW19).
+    # Each half of the season gets a full set: wildcard, bench boost, free hit, triple captain.
     all_chips = {"wildcard", "bboost", "freehit", "3xc"}
-    # Note: 2 wildcards available (1 per half), simplified here
-    chips_remaining = list(all_chips - chips_used)
+    halfway_gw = 19  # chips reset after this gameweek
+
+    if current_gw > halfway_gw:
+        # Second half: only count chips used in GW20+
+        chips_used_this_half = {c["name"] for c in chips if c["event"] > halfway_gw}
+    else:
+        # First half: only count chips used in GW1-19
+        chips_used_this_half = {c["name"] for c in chips if c["event"] <= halfway_gw}
+
+    chips_remaining = sorted(all_chips - chips_used_this_half)
 
     return {
         "bank": round(bank, 1),
