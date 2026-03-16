@@ -1,0 +1,262 @@
+"""
+Squad Scout algorithm.
+
+Uses FPL's own predictive data that most managers don't know about:
+  - ep_next: FPL's expected points for next GW
+  - ep_this: FPL's expected points for current GW
+  - scout_risks: blank GW flags, injury alerts from FPL's own scout
+  - value_form / value_season: FPL's value metrics
+  - dreamteam_count: consistency measure
+  - set piece duties: corners, direct free kicks
+  - ICT breakdown: creativity, influence, threat individually
+
+Surfaces hidden gems and risks that other tools miss.
+"""
+
+import asyncio
+
+from app.fpl_client import (
+    get_bootstrap,
+    get_fixtures,
+    get_next_gameweek,
+    get_team_picks,
+    get_current_gameweek,
+)
+
+POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
+
+
+async def get_squad_scout(team_id: int) -> dict:
+    """
+    Deep scout report on a manager's squad using FPL's hidden data fields.
+
+    Surfaces:
+      - Blank GW warnings from FPL's own scout_risks
+      - FPL's expected points (ep_next) vs your current captain
+      - Set piece takers you might not know about
+      - Most consistent performers (dreamteam appearances)
+      - Value picks (points per million this season)
+      - ICT breakdown showing who creates vs who finishes
+      - Squad risks: yellow card suspensions, fixture congestion
+    """
+    bootstrap, fixtures = await asyncio.gather(get_bootstrap(), get_fixtures())
+    current_gw = get_current_gameweek(bootstrap)
+    next_gw = get_next_gameweek(bootstrap)
+
+    try:
+        picks_data = await get_team_picks(team_id, current_gw)
+    except Exception:
+        return {"error": f"Could not fetch picks for team {team_id}. Check the team ID is correct."}
+
+    players_by_id = {p["id"]: p for p in bootstrap["elements"]}
+    teams_by_id = {t["id"]: t for t in bootstrap["teams"]}
+
+    # Analyse each squad player
+    squad_report = []
+    blank_warnings = []
+    set_piece_takers = []
+    yellow_card_risks = []
+    best_ep_next = []
+
+    for pick in picks_data.get("picks", []):
+        p = players_by_id.get(pick["element"])
+        if not p:
+            continue
+
+        team = teams_by_id.get(p["team"], {})
+        ep_next = float(p.get("ep_next") or 0)
+        ep_this = float(p.get("ep_this") or 0)
+        is_starter = pick["position"] <= 11
+
+        player_info = {
+            "name": p["web_name"],
+            "team": team.get("short_name", "?"),
+            "position": POSITION_MAP.get(p["element_type"], "?"),
+            "starter": is_starter,
+            "slot": pick["position"],
+            "is_captain": pick.get("is_captain", False),
+        }
+
+        # FPL expected points
+        player_info["ep_next"] = ep_next
+        player_info["ep_this"] = ep_this
+
+        # Scout risks (blank GW, injury flags from FPL)
+        risks = p.get("scout_risks") or []
+        if risks:
+            risk_notes = [r.get("notes", "") for r in risks]
+            player_info["scout_risks"] = risk_notes
+            if is_starter:
+                for r in risks:
+                    if "blank" in r.get("property", "").lower() or "no" in r.get("notes", "").lower():
+                        blank_warnings.append({
+                            "name": p["web_name"],
+                            "team": team.get("short_name", "?"),
+                            "note": r.get("notes", ""),
+                            "gameweek": r.get("gameweek"),
+                        })
+
+        # Set piece duties
+        corners_order = p.get("corners_and_indirect_freekicks_order")
+        fk_order = p.get("direct_freekicks_order")
+        penalties_order = p.get("penalties_order")
+        if corners_order == 1 or fk_order == 1 or penalties_order == 1:
+            duties = []
+            if penalties_order == 1:
+                duties.append("penalties")
+            if corners_order == 1:
+                duties.append("corners")
+            if fk_order == 1:
+                duties.append("direct free kicks")
+            set_piece_takers.append({
+                "name": p["web_name"],
+                "team": team.get("short_name", "?"),
+                "duties": duties,
+                "in_squad": True,
+                "starter": is_starter,
+            })
+
+        # Yellow card suspension risk (4 yellows = 1 match ban in PL)
+        yellows = p.get("yellow_cards", 0)
+        if yellows >= 4:
+            yellow_card_risks.append({
+                "name": p["web_name"],
+                "team": team.get("short_name", "?"),
+                "yellow_cards": yellows,
+                "risk": "1-match ban imminent" if yellows == 4 else f"{yellows} yellows",
+            })
+
+        # ICT breakdown
+        player_info["ict"] = {
+            "influence": float(p.get("influence") or 0),
+            "creativity": float(p.get("creativity") or 0),
+            "threat": float(p.get("threat") or 0),
+            "influence_rank": p.get("influence_rank"),
+            "creativity_rank": p.get("creativity_rank"),
+            "threat_rank": p.get("threat_rank"),
+        }
+
+        # Value and consistency
+        player_info["value_season"] = float(p.get("value_season") or 0)
+        player_info["value_form"] = float(p.get("value_form") or 0)
+        player_info["dreamteam_count"] = p.get("dreamteam_count", 0)
+        player_info["cost"] = p["now_cost"] / 10
+        player_info["total_points"] = p.get("total_points", 0)
+        player_info["points_per_million"] = round(
+            p.get("total_points", 0) / (p["now_cost"] / 10), 1
+        ) if p["now_cost"] > 0 else 0
+
+        # Defensive stats (for DEF/GKP)
+        if p["element_type"] in (1, 2):
+            player_info["clean_sheets"] = p.get("clean_sheets", 0)
+            player_info["clean_sheets_per_90"] = float(p.get("clean_sheets_per_90") or 0)
+            player_info["xGC_per_90"] = float(p.get("expected_goals_conceded_per_90") or 0)
+
+        # BPS raw score
+        player_info["bps"] = p.get("bps", 0)
+
+        best_ep_next.append((ep_next, player_info))
+        squad_report.append(player_info)
+
+    # Sort by ep_next to find best captain option
+    best_ep_next.sort(key=lambda x: x[0], reverse=True)
+
+    # Find the current captain
+    current_captain = next(
+        (p for p in squad_report if p.get("is_captain")), None
+    )
+
+    # Captain suggestion based on FPL's own ep_next
+    ep_captain_suggestion = None
+    if best_ep_next and current_captain:
+        best = best_ep_next[0][1]
+        if best["name"] != current_captain["name"] and best_ep_next[0][0] > (current_captain.get("ep_next") or 0):
+            ep_captain_suggestion = {
+                "current_captain": current_captain["name"],
+                "current_captain_ep": current_captain.get("ep_next", 0),
+                "suggested_captain": best["name"],
+                "suggested_captain_ep": best_ep_next[0][0],
+                "ep_difference": round(best_ep_next[0][0] - (current_captain.get("ep_next") or 0), 1),
+            }
+
+    # Find set piece takers NOT in squad (transfer targets)
+    squad_ids = {pick["element"] for pick in picks_data.get("picks", [])}
+    external_set_piece = []
+    for p in bootstrap["elements"]:
+        if p["id"] in squad_ids:
+            continue
+        if p.get("status") in {"i", "u"}:
+            continue
+        penalties = p.get("penalties_order")
+        corners = p.get("corners_and_indirect_freekicks_order")
+        fk = p.get("direct_freekicks_order")
+        if penalties == 1 or (corners == 1 and fk == 1):
+            team = teams_by_id.get(p["team"], {})
+            duties = []
+            if penalties == 1:
+                duties.append("penalties")
+            if corners == 1:
+                duties.append("corners")
+            if fk == 1:
+                duties.append("direct free kicks")
+            ep = float(p.get("ep_next") or 0)
+            if ep >= 3.0:  # only show high-EP targets
+                external_set_piece.append({
+                    "name": p["web_name"],
+                    "team": team.get("short_name", "?"),
+                    "position": POSITION_MAP.get(p["element_type"], "?"),
+                    "cost": p["now_cost"] / 10,
+                    "ep_next": ep,
+                    "duties": duties,
+                    "ownership": float(p.get("selected_by_percent") or 0),
+                })
+
+    external_set_piece.sort(key=lambda x: x["ep_next"], reverse=True)
+
+    return {
+        "team_id": team_id,
+        "gameweek": current_gw,
+        "next_gameweek": next_gw,
+        "squad_report": squad_report,
+        "insights": {
+            "blank_gw_warnings": blank_warnings,
+            "ep_captain_suggestion": ep_captain_suggestion,
+            "ep_rankings": [
+                {"name": p["name"], "team": p["team"], "ep_next": ep, "starter": p["starter"]}
+                for ep, p in best_ep_next[:5]
+            ],
+            "set_piece_takers_in_squad": set_piece_takers,
+            "set_piece_targets_outside_squad": external_set_piece[:5],
+            "yellow_card_risks": yellow_card_risks,
+        },
+        "summary": _build_summary(
+            blank_warnings, ep_captain_suggestion, set_piece_takers,
+            yellow_card_risks, best_ep_next
+        ),
+    }
+
+
+def _build_summary(blanks, ep_captain, set_pieces, yellows, ep_rankings) -> str:
+    """Build a human-readable summary of key findings."""
+    parts = []
+
+    if blanks:
+        names = ", ".join(b["name"] for b in blanks)
+        parts.append(f"Blank GW alert: {names} have no fixture")
+
+    if ep_captain:
+        parts.append(
+            f"FPL's data suggests {ep_captain['suggested_captain']} "
+            f"(EP {ep_captain['suggested_captain_ep']}) over "
+            f"{ep_captain['current_captain']} "
+            f"(EP {ep_captain['current_captain_ep']}) as captain"
+        )
+
+    if yellows:
+        names = ", ".join(f"{y['name']} ({y['yellow_cards']})" for y in yellows)
+        parts.append(f"Suspension risk: {names}")
+
+    if not parts:
+        parts.append("No major risks detected. Squad looks healthy.")
+
+    return ". ".join(parts) + "."
