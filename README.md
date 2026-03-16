@@ -93,7 +93,7 @@ Try these in Claude Desktop:
 
 ## How It Works
 
-FPL Intelligence connects directly to the [official FPL API](https://fantasy.premierleague.com/api/) — the same data source used by the FPL website. All data is real-time and free. The server runs locally on your machine and communicates with Claude Desktop via the [Model Context Protocol (MCP)](https://modelcontextprotocol.io).
+FPL Intelligence connects directly to the [FPL API](https://www.postman.com/fplassist/fpl-assist/collection/zqlmv01/fantasy-premier-league-api) — the same free, public data source used by the FPL website. All data is real-time. The server runs locally on your machine and communicates with Claude Desktop via the [Model Context Protocol (MCP)](https://modelcontextprotocol.io).
 
 No API keys. No accounts. No data leaves your machine except FPL API calls.
 
