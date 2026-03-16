@@ -12,6 +12,7 @@ Replay protection: used tx hashes persisted in SQLite (data/payments.db).
 
 import asyncio
 import logging
+import re
 import sqlite3
 from pathlib import Path
 
@@ -47,6 +48,7 @@ def _init_db() -> None:
     _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(_DB_PATH))
     try:
+        conn.execute("PRAGMA journal_mode=WAL")  # better concurrency under async
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS used_tx_hashes (
@@ -139,6 +141,12 @@ async def verify_payment(tx_hash: str, path: str) -> None:
     All blocking Web3 RPC calls are run in a thread executor to avoid
     blocking the async event loop.
     """
+    # Validate tx hash format (0x + 64 hex chars)
+    clean_hash = tx_hash.strip()
+    if not re.fullmatch(r"0x[0-9a-fA-F]{64}", clean_hash if clean_hash.startswith("0x") else "0x" + clean_hash):
+        raise PaymentVerificationError("Invalid transaction hash format.")
+    tx_hash = clean_hash
+
     if settings.test_mode:
         logger.info("TEST_MODE: skipping on-chain verification for %s (tx: %s)", path, tx_hash)
         if not _check_and_insert_tx(tx_hash.lower(), path):
@@ -171,6 +179,10 @@ async def verify_payment(tx_hash: str, path: str) -> None:
         if receipt is None:
             raise PaymentVerificationError("Transaction not found on Base Sepolia.")
 
+        # Verify transaction succeeded (status=1). A reverted tx (status=0) must be rejected.
+        if receipt.get("status") != 1:
+            raise PaymentVerificationError("Transaction reverted on-chain.")
+
         # Confirmation check
         current_block = w3.eth.block_number
         tx_block = receipt["blockNumber"]
@@ -192,9 +204,12 @@ async def verify_payment(tx_hash: str, path: str) -> None:
                 paid_amount += event["args"]["value"]
 
         if paid_amount < required_amount:
+            logger.warning(
+                "Insufficient payment for %s: required %d, received %d (tx: %s)",
+                path, required_amount, paid_amount, tx_hash,
+            )
             raise PaymentVerificationError(
-                f"Insufficient payment. Required {required_amount} USDC units "
-                f"(${required_amount / 1_000_000:.4f}), received {paid_amount}."
+                "Insufficient payment. Check the required amount and retry."
             )
 
         logger.info("Payment accepted: %s (%.4f USDC) for %s", tx_hash, paid_amount / 1_000_000, path)

@@ -29,9 +29,9 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_methods=["GET"],
-    allow_headers=["*"],
+    allow_headers=["X-Payment"],
 )
 
 # Register x402 payment middleware
@@ -126,9 +126,9 @@ async def price_predictions():
 
 @app.get("/api/fpl/transfer-suggest")
 async def transfer_suggest(
-    team_id: int = Query(..., description="FPL team ID"),
+    team_id: int = Query(..., ge=1, le=20_000_000, description="FPL team ID"),
     free_transfers: int = Query(1, ge=1, le=2, description="Free transfers available"),
-    bank: float = Query(0.0, description="Bank balance in millions (e.g. 1.5)"),
+    bank: float = Query(0.0, ge=0, le=200, description="Bank balance in millions (e.g. 1.5)"),
 ):
     """
     Recommended transfers in/out for a given FPL team.
@@ -143,7 +143,7 @@ async def transfer_suggest(
 
 
 @app.get("/api/fpl/live-points")
-async def live_points(team_id: int = Query(..., description="FPL team ID")):
+async def live_points(team_id: int = Query(..., ge=1, le=20_000_000, description="FPL team ID")):
     """
     Live score, projected bonus, auto-sub scenarios, rank estimate.
     """
