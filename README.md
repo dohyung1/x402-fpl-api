@@ -19,7 +19,7 @@ Add this to your Claude Desktop config (`~/Library/Application Support/Claude/cl
 
 Restart Claude Desktop. Then ask:
 
-> "Analyze FPL team 5456980 and give me your full recommendation."
+> "Analyze FPL team YOUR_TEAM_ID and give me your full recommendation."
 
 Claude will automatically detect your bank balance, free transfers, chips used, and give you personalized captain picks, transfer suggestions, differentials, and fixture outlook.
 
@@ -61,10 +61,10 @@ cp .env.example .env  # Edit with your wallet address
 
 ## Find Your FPL Team ID
 
-Go to the [FPL website](https://fantasy.premierleague.com), click "My Team", and look at the URL:
+Go to the [FPL website](https://fantasy.premierleague.com), click "Points", and look at the URL:
 
 ```
-https://fantasy.premierleague.com/entry/YOUR_TEAM_ID/event/30
+https://fantasy.premierleague.com/entry/YOUR_TEAM_ID/event/<gw>
 ```
 
 ## Tech Stack
