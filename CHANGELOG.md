@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-03-16
+
+### Added
+- MCP server instructions for better Claude tool routing
+- "USE THIS WHEN" guidance in all 11 tool descriptions
+- MCP resources: `fpl://status` (gameweek/deadline info), `fpl://teams` (all 20 PL teams)
+- `isError` flag on all tool failures (MCP best practice — lets Claude self-correct)
+- Input validation at MCP boundary (team_id, gameweek, position, player names)
+- GitHub Actions CI (pytest on Python 3.12 + 3.13, ruff lint + format)
+- GitHub Actions publish workflow (auto-publish to PyPI on release)
+- Issue templates, PR template, CONTRIBUTING.md, SECURITY.md, CHANGELOG.md
+- Dependabot for automated dependency updates
+- ruff linter + formatter configuration
+
+### Fixed
+- Transaction status verification — reject reverted on-chain transactions (status != 1)
+- Transaction hash format validation (0x + 64 hex chars)
+- SQLite WAL mode for better async concurrency
+- Payment error messages no longer leak internal amounts
+- CORS now configurable via `CORS_ORIGINS` env var (was hardcoded wildcard)
+- CORS allowed headers restricted to `X-Payment` only
+- FPL API retry logic (2 retries with exponential backoff)
+- Web3 RPC provider timeout (15s, was unlimited)
+- TEST_MODE startup guard — refuses to start with mainnet RPC
+- MCP error responses no longer leak exception details
+- HTTP API gameweek validation (1-38) and max_ownership validation (0.1-100)
+- All Python files formatted consistently with ruff
+
+### Changed
+- README rewritten with Quick Start flow, example prompts, How It Works section
+
 ## [0.3.0] - 2026-03-16
 
 ### Added
