@@ -2,15 +2,31 @@
 
 AI-powered Fantasy Premier League assistant for Claude Desktop. Get personalized captain picks, transfer suggestions, differentials, fixture analysis, price predictions, and live points — all from real FPL data.
 
-## Setup
+## Install
+
+```bash
+pip install fpl-intelligence
+```
+
+Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "fpl": {
+      "command": "fpl-intelligence"
+    }
+  }
+}
+```
+
+**Or install from source:**
 
 ```bash
 git clone https://github.com/dohyung1/x402-fpl-api.git
 cd x402-fpl-api
 uv sync
 ```
-
-Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
 {
