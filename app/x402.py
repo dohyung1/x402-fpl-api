@@ -88,6 +88,11 @@ def _check_and_insert_tx(tx_hash: str, path: str) -> bool:
 # Initialize database on module load
 _init_db()
 
+if settings.test_mode:
+    if "mainnet" in settings.base_rpc_url.lower():
+        raise RuntimeError("FATAL: TEST_MODE=true with a mainnet RPC URL. Refusing to start.")
+    logger.warning("TEST_MODE is enabled — payment verification is BYPASSED. Do not use in production.")
+
 
 def _get_web3() -> Web3:
     """
@@ -96,7 +101,7 @@ def _get_web3() -> Web3:
     No caching -- Web3 instances are lightweight, and caching a broken
     connection (e.g., RPC down at startup) would require a server restart.
     """
-    w3 = Web3(Web3.HTTPProvider(settings.base_rpc_url))
+    w3 = Web3(Web3.HTTPProvider(settings.base_rpc_url, request_kwargs={"timeout": 15}))
     if not w3.is_connected():
         logger.warning("Could not connect to Base RPC at %s", settings.base_rpc_url)
     return w3

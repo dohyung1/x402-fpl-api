@@ -85,9 +85,9 @@ async def captain_pick(gameweek: int | None = None) -> dict:
         from app.algorithms.captain import get_captain_picks
 
         return await get_captain_picks(gameweek=gameweek)
-    except Exception as exc:
+    except Exception:
         logger.exception("captain_pick failed")
-        return _error(f"Failed to get captain picks: {exc}")
+        return _error("Failed to get captain picks. The FPL API may be temporarily unavailable — try again.")
 
 
 @mcp.tool()
@@ -113,9 +113,9 @@ async def differential_finder(
         from app.algorithms.differentials import get_differentials
 
         return await get_differentials(max_ownership_pct=max_ownership_pct, gameweek=gameweek)
-    except Exception as exc:
+    except Exception:
         logger.exception("differential_finder failed")
-        return _error(f"Failed to find differentials: {exc}")
+        return _error("Failed to find differentials. The FPL API may be temporarily unavailable — try again.")
 
 
 @mcp.tool()
@@ -140,9 +140,9 @@ async def fixture_outlook(
         from app.algorithms.fixtures import get_fixture_outlook
 
         return await get_fixture_outlook(gameweeks_ahead=gameweeks_ahead, position=position)
-    except Exception as exc:
+    except Exception:
         logger.exception("fixture_outlook failed")
-        return _error(f"Failed to get fixture outlook: {exc}")
+        return _error("Failed to get fixture outlook. The FPL API may be temporarily unavailable — try again.")
 
 
 @mcp.tool()
@@ -159,9 +159,9 @@ async def price_predictions() -> dict:
         from app.algorithms.prices import get_price_predictions
 
         return await get_price_predictions()
-    except Exception as exc:
+    except Exception:
         logger.exception("price_predictions failed")
-        return _error(f"Failed to get price predictions: {exc}")
+        return _error("Failed to get price predictions. The FPL API may be temporarily unavailable — try again.")
 
 
 @mcp.tool()
@@ -191,9 +191,9 @@ async def transfer_suggestions(
             free_transfers=max(1, min(5, free_transfers)),
             bank_m=max(0.0, bank),
         )
-    except Exception as exc:
+    except Exception:
         logger.exception("transfer_suggestions failed")
-        return _error(f"Failed to get transfer suggestions: {exc}")
+        return _error("Failed to get transfer suggestions. Check that the team ID is correct and try again.")
 
 
 @mcp.tool()
@@ -223,9 +223,9 @@ async def player_comparison(player_names: list[str], gameweeks_ahead: int = 5) -
             player_names=player_names,
             gameweeks_ahead=max(1, min(10, gameweeks_ahead)),
         )
-    except Exception as exc:
+    except Exception:
         logger.exception("player_comparison failed")
-        return _error(f"Failed to compare players: {exc}")
+        return _error("Failed to compare players. Check the player names and try again.")
 
 
 @mcp.tool()
@@ -246,9 +246,9 @@ async def live_points(team_id: int) -> dict:
         from app.algorithms.live import get_live_points
 
         return await get_live_points(team_id=team_id)
-    except Exception as exc:
+    except Exception:
         logger.exception("live_points failed")
-        return _error(f"Failed to get live points: {exc}")
+        return _error("Failed to get live points. Check that the team ID is correct and try again.")
 
 
 @mcp.tool()
@@ -491,9 +491,9 @@ async def is_hit_worth_it(
             player_in_id=player_in_id,
             gameweeks_ahead=max(1, min(10, gameweeks_ahead)),
         )
-    except Exception as exc:
+    except Exception:
         logger.exception("is_hit_worth_it failed")
-        return _error(f"Failed to analyze hit: {exc}")
+        return _error("Failed to analyze hit. Check that both player IDs are valid and try again.")
 
 
 @mcp.tool()
@@ -516,9 +516,9 @@ async def chip_strategy(team_id: int) -> dict:
         from app.algorithms.chips import get_chip_strategy
 
         return await get_chip_strategy(team_id=team_id)
-    except Exception as exc:
+    except Exception:
         logger.exception("chip_strategy failed")
-        return _error(f"Failed to get chip strategy: {exc}")
+        return _error("Failed to get chip strategy. Check that the team ID is correct and try again.")
 
 
 # ---------------------------------------------------------------------------
@@ -544,9 +544,9 @@ async def squad_scout(team_id: int) -> dict:
         from app.algorithms.scout import get_squad_scout
 
         return await get_squad_scout(team_id=team_id)
-    except Exception as exc:
+    except Exception:
         logger.exception("squad_scout failed")
-        return _error(f"Failed to scout squad: {exc}")
+        return _error("Failed to scout squad. Check that the team ID is correct and try again.")
 
 
 # ---------------------------------------------------------------------------
