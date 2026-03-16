@@ -4,32 +4,44 @@ Differential Finder algorithm.
 Finds underowned players outperforming their ownership %.
 
 differential_score =
-    recent_form × 3.0
-  + points_per_game × 1.0
-  - fixture_difficulty × 0.5
-  + ict_index × 0.01
-  - ownership_pct × 0.1    (penalise highly owned — we want the differentials)
+    recent_form * 3.0
+  + points_per_game * 1.0
+  - fixture_difficulty * 0.5
+  + ict_index * 0.01
+  - ownership_pct * 0.1    (penalise highly owned -- we want the differentials)
+
+DGW support: fixture difficulty is the average across all fixtures in the GW.
 """
 
-from app.fpl_client import get_bootstrap, get_current_gameweek, get_fixtures
+from app.fpl_client import get_bootstrap, get_next_gameweek, get_fixtures
 from app.algorithms.captain import _build_fixture_map
 
 POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
 
 
-def _differential_score(player: dict, fixture: dict | None, ownership_pct: float) -> float:
+def _differential_score(player: dict, fixtures: list[dict] | None, ownership_pct: float) -> float:
     form = float(player.get("form") or 0)
     ppg = float(player.get("points_per_game") or 0)
     ict = float(player.get("ict_index") or 0)
-    fdr = fixture["fdr"] if fixture else 3
+
+    # Average FDR across all fixtures (DGW support)
+    if fixtures:
+        avg_fdr = sum(f["fdr"] for f in fixtures) / len(fixtures)
+    else:
+        avg_fdr = 3
 
     score = (
         form * 3.0
         + ppg * 1.0
-        - fdr * 0.5
+        - avg_fdr * 0.5
         + ict * 0.01
         - ownership_pct * 0.1
     )
+
+    # DGW bonus: more fixtures = more points potential
+    if fixtures and len(fixtures) > 1:
+        score += len(fixtures) * 1.0
+
     return round(score, 3)
 
 
@@ -42,12 +54,13 @@ async def get_differentials(
     Return underowned players outperforming their ownership %.
 
     max_ownership_pct: only include players selected by fewer than this %.
+    Uses the next gameweek by default (what managers are prepping for).
     """
     import asyncio
     bootstrap, fixtures = await asyncio.gather(get_bootstrap(), get_fixtures())
 
     if gameweek is None:
-        gameweek = get_current_gameweek(bootstrap)
+        gameweek = get_next_gameweek(bootstrap)
 
     teams = {t["id"]: t for t in bootstrap["teams"]}
     fixture_map = _build_fixture_map(fixtures, gameweek)
@@ -60,17 +73,36 @@ async def get_differentials(
         if player.get("status") in {"i", "u"}:  # skip injured/unavailable
             continue
 
-        fixture = fixture_map.get(player["team"])
-        score = _differential_score(player, fixture, ownership)
-        scored.append((score, player, fixture))
+        player_fixtures = fixture_map.get(player["team"])
+        score = _differential_score(player, player_fixtures, ownership)
+        scored.append((score, player, player_fixtures))
 
     scored.sort(key=lambda x: x[0], reverse=True)
 
     results = []
-    for score, player, fixture in scored[:top_n]:
+    for score, player, player_fixtures in scored[:top_n]:
         team = teams.get(player["team"], {})
-        opponent_id = fixture["opponent"] if fixture else None
-        opponent = teams.get(opponent_id, {}).get("short_name", "?") if opponent_id else "?"
+
+        # Build fixture info supporting DGWs
+        fixture_info = None
+        if player_fixtures:
+            fixture_entries = []
+            for fix in player_fixtures:
+                opponent_id = fix["opponent"]
+                opponent = teams.get(opponent_id, {}).get("short_name", "?")
+                fixture_entries.append({
+                    "opponent": opponent,
+                    "venue": "Home" if fix["is_home"] else "Away",
+                    "fdr": fix["fdr"],
+                })
+            fixture_info = {
+                "fixtures": fixture_entries,
+                "gameweek": gameweek,
+                "is_dgw": len(fixture_entries) > 1,
+                "opponent": fixture_entries[0]["opponent"],
+                "venue": fixture_entries[0]["venue"],
+                "fdr": fixture_entries[0]["fdr"],
+            }
 
         results.append(
             {
@@ -83,14 +115,7 @@ async def get_differentials(
                     "cost": player["now_cost"] / 10,
                     "selected_by_pct": float(player.get("selected_by_percent") or 0),
                 },
-                "fixture": {
-                    "opponent": opponent,
-                    "venue": "Home" if (fixture and fixture["is_home"]) else "Away",
-                    "fdr": fixture["fdr"] if fixture else None,
-                    "gameweek": gameweek,
-                }
-                if fixture
-                else None,
+                "fixture": fixture_info,
                 "score": score,
                 "stats": {
                     "form": float(player.get("form") or 0),
@@ -108,6 +133,6 @@ async def get_differentials(
     return {
         "gameweek": gameweek,
         "max_ownership_pct": max_ownership_pct,
-        "algorithm_version": "1.0",
+        "algorithm_version": "1.1",
         "differentials": results,
     }

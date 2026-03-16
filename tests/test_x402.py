@@ -6,11 +6,12 @@ so we don't need a live Base Sepolia connection.
 """
 
 import pytest
+import sqlite3
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.x402 import _used_tx_hashes
+from app.x402 import _DB_PATH, _init_db
 
 client = TestClient(app, raise_server_exceptions=False)
 
@@ -19,14 +20,27 @@ FAKE_TX = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
 
 @pytest.fixture(autouse=True)
 def clear_used_hashes():
-    """Reset replay-protection set between tests."""
-    _used_tx_hashes.clear()
+    """Reset replay-protection database between tests."""
+    # Clear the used_tx_hashes table
+    _init_db()
+    conn = sqlite3.connect(str(_DB_PATH))
+    try:
+        conn.execute("DELETE FROM used_tx_hashes")
+        conn.commit()
+    finally:
+        conn.close()
     yield
-    _used_tx_hashes.clear()
+    # Clean up after test
+    conn = sqlite3.connect(str(_DB_PATH))
+    try:
+        conn.execute("DELETE FROM used_tx_hashes")
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # ---------------------------------------------------------------------------
-# Health / root — should never require payment
+# Health / root -- should never require payment
 # ---------------------------------------------------------------------------
 
 def test_health_no_payment():
@@ -44,7 +58,7 @@ def test_root_no_payment():
 
 
 # ---------------------------------------------------------------------------
-# 402 — no payment header
+# 402 -- no payment header
 # ---------------------------------------------------------------------------
 
 def test_captain_pick_requires_payment():
@@ -104,7 +118,7 @@ def test_402_response_has_correct_price_differentials():
 
 
 # ---------------------------------------------------------------------------
-# Payment verification — mocked on-chain calls
+# Payment verification -- mocked on-chain calls
 # ---------------------------------------------------------------------------
 
 def _mock_receipt(to_wallet: str, amount: int, block: int = 100):
@@ -151,7 +165,7 @@ def test_valid_payment_passes_middleware():
             "/api/fpl/captain-pick",
             headers={"X-Payment": FAKE_TX},
         )
-    # Should NOT be 402 — either 200 (real FPL data) or 500 (FPL unreachable in test)
+    # Should NOT be 402 -- either 200 (real FPL data) or 500 (FPL unreachable in test)
     assert resp.status_code != 402
 
 
@@ -170,7 +184,7 @@ def test_replay_attack_rejected():
         resp1 = client.get("/api/fpl/captain-pick", headers={"X-Payment": FAKE_TX})
         assert resp1.status_code != 402
 
-        # Second use with same hash → 402
+        # Second use with same hash -> 402
         resp2 = client.get("/api/fpl/captain-pick", headers={"X-Payment": FAKE_TX})
         assert resp2.status_code == 402
         assert "already used" in resp2.json()["error"].lower()
@@ -186,7 +200,14 @@ def test_insufficient_payment_rejected():
     )
 
     with patch("app.x402._get_web3", return_value=mock_w3), \
-         patch("app.x402.Web3.to_checksum_address", return_value=settings.usdc_contract_address):
+         patch("app.x402.Web3.to_checksum_address", return_value=settings.usdc_contract_address), \
+         patch("app.x402.settings") as mock_settings:
+        mock_settings.test_mode = False
+        mock_settings.payment_wallet_address = settings.payment_wallet_address
+        mock_settings.usdc_contract_address = settings.usdc_contract_address
+        mock_settings.required_confirmations = settings.required_confirmations
+        mock_settings.service_name = settings.service_name
+        mock_settings.service_description = settings.service_description
         resp = client.get("/api/fpl/captain-pick", headers={"X-Payment": FAKE_TX})
     assert resp.status_code == 402
     assert "insufficient" in resp.json()["error"].lower()
@@ -195,6 +216,7 @@ def test_insufficient_payment_rejected():
 def test_unknown_tx_rejected():
     """A tx hash that doesn't exist on-chain is rejected."""
     from web3.exceptions import TransactionNotFound
+    from app.config import settings
 
     mock_w3 = MagicMock()
     mock_w3.is_connected.return_value = True
@@ -204,7 +226,14 @@ def test_unknown_tx_rejected():
         message="Transaction not found"
     )
 
-    with patch("app.x402._get_web3", return_value=mock_w3):
+    with patch("app.x402._get_web3", return_value=mock_w3), \
+         patch("app.x402.settings") as mock_settings:
+        mock_settings.test_mode = False
+        mock_settings.payment_wallet_address = settings.payment_wallet_address
+        mock_settings.usdc_contract_address = settings.usdc_contract_address
+        mock_settings.required_confirmations = settings.required_confirmations
+        mock_settings.service_name = settings.service_name
+        mock_settings.service_description = settings.service_description
         resp = client.get("/api/fpl/captain-pick", headers={"X-Payment": FAKE_TX})
     assert resp.status_code == 402
     assert "not found" in resp.json()["error"].lower()
