@@ -405,6 +405,29 @@ async def chip_strategy(team_id: int) -> dict:
 
 # ---------------------------------------------------------------------------
 # MCP Prompt Templates
+@mcp.tool()
+async def squad_scout(team_id: int) -> dict:
+    """
+    Deep scout report using FPL's hidden data fields most managers don't know about.
+
+    Surfaces insights you won't find in standard FPL tools:
+    - Blank gameweek warnings from FPL's own scout data
+    - FPL's expected points (ep_next) — their internal prediction for each player
+    - Set piece takers in your squad and transfer targets with set piece duties
+    - Yellow card suspension risks
+    - ICT breakdown (creativity vs influence vs threat)
+    - Points per million value rankings
+    - Captain suggestion based on FPL's own expected points model
+
+    Args:
+        team_id: Your FPL team ID.
+    """
+    from app.algorithms.scout import get_squad_scout
+
+    return await get_squad_scout(team_id=team_id)
+
+
+# ---------------------------------------------------------------------------
 # Pre-built prompts that appear in Claude Desktop's prompt selector.
 # Help new users discover what the FPL Intelligence server can do.
 # ---------------------------------------------------------------------------
