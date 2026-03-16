@@ -10,12 +10,12 @@ Returns a structured comparison with a verdict recommending the best pick.
 
 import asyncio
 
-from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek
 from app.algorithms.captain import (
     POSITION_MAP,
     _build_fixture_map,
     _score_player,
 )
+from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek
 
 
 def _fuzzy_match_player(name: str, elements: list[dict]) -> dict | None:
@@ -76,12 +76,14 @@ def _build_upcoming_fixtures(
         for fix in gw_fixtures:
             opp = teams_by_id.get(fix["opponent"], {}).get("short_name", "?")
             venue = "H" if fix["is_home"] else "A"
-            upcoming.append({
-                "gameweek": gw,
-                "opponent": f"{opp}({venue})",
-                "fdr": fix["fdr"],
-                "is_home": fix["is_home"],
-            })
+            upcoming.append(
+                {
+                    "gameweek": gw,
+                    "opponent": f"{opp}({venue})",
+                    "fdr": fix["fdr"],
+                    "is_home": fix["is_home"],
+                }
+            )
     return upcoming
 
 
@@ -101,7 +103,9 @@ def _build_verdict(profiles: list[dict]) -> str:
         second_best = max(others, key=lambda p: p["captain_score"])
         margin = best["captain_score"] - second_best["captain_score"]
         if margin > 3:
-            reasons.append(f"significantly higher captain score ({best['captain_score']:.1f} vs {second_best['captain_score']:.1f})")
+            reasons.append(
+                f"significantly higher captain score ({best['captain_score']:.1f} vs {second_best['captain_score']:.1f})"
+            )
         elif margin > 0:
             reasons.append(f"higher captain score ({best['captain_score']:.1f} vs {second_best['captain_score']:.1f})")
 
@@ -187,9 +191,7 @@ async def compare_players(
         return {
             "error": "Could not match all player names.",
             "details": errors,
-            "matched": [
-                {"query": q, "matched_name": p["web_name"]} for q, p in matched
-            ],
+            "matched": [{"query": q, "matched_name": p["web_name"]} for q, p in matched],
         }
 
     # Build profiles
@@ -227,40 +229,42 @@ async def compare_players(
 
         # Upcoming fixtures
         upcoming = _build_upcoming_fixtures(
-            team_id, fixtures, next_gw, gameweeks_ahead, teams_by_id,
+            team_id,
+            fixtures,
+            next_gw,
+            gameweeks_ahead,
+            teams_by_id,
         )
-        avg_fdr = round(
-            sum(f["fdr"] for f in upcoming) / len(upcoming), 2
-        ) if upcoming else None
+        avg_fdr = round(sum(f["fdr"] for f in upcoming) / len(upcoming), 2) if upcoming else None
 
-        profiles.append({
-            "query": query,
-            "name": player["web_name"],
-            "full_name": f"{player.get('first_name', '')} {player.get('second_name', '')}",
-            "id": player["id"],
-            "team": team.get("short_name", "?"),
-            "position": POSITION_MAP.get(player["element_type"], "?"),
-            "cost": cost,
-            "ownership_pct": ownership,
-            "form": form,
-            "points_per_game": ppg,
-            "total_points": total_points,
-            "xg_per_90": xg_per_90,
-            "xa_per_90": xa_per_90,
-            "ict_index": ict,
-            "captain_score": captain_score,
-            "value_score": value_score,
-            "net_transfers_this_gw": net_transfers,
-            "transfer_pressure": (
-                "Rising" if net_transfers > 50_000
-                else "Falling" if net_transfers < -50_000
-                else "Stable"
-            ),
-            "status": player.get("status", "a"),
-            "chance_of_playing": player.get("chance_of_playing_next_round"),
-            "upcoming_fixtures": upcoming,
-            "avg_fdr_next_{}_gws".format(gameweeks_ahead): avg_fdr,
-        })
+        profiles.append(
+            {
+                "query": query,
+                "name": player["web_name"],
+                "full_name": f"{player.get('first_name', '')} {player.get('second_name', '')}",
+                "id": player["id"],
+                "team": team.get("short_name", "?"),
+                "position": POSITION_MAP.get(player["element_type"], "?"),
+                "cost": cost,
+                "ownership_pct": ownership,
+                "form": form,
+                "points_per_game": ppg,
+                "total_points": total_points,
+                "xg_per_90": xg_per_90,
+                "xa_per_90": xa_per_90,
+                "ict_index": ict,
+                "captain_score": captain_score,
+                "value_score": value_score,
+                "net_transfers_this_gw": net_transfers,
+                "transfer_pressure": (
+                    "Rising" if net_transfers > 50_000 else "Falling" if net_transfers < -50_000 else "Stable"
+                ),
+                "status": player.get("status", "a"),
+                "chance_of_playing": player.get("chance_of_playing_next_round"),
+                "upcoming_fixtures": upcoming,
+                "avg_fdr_next_{}_gws".format(gameweeks_ahead): avg_fdr,
+            }
+        )
 
     verdict = _build_verdict(profiles)
 

@@ -9,7 +9,6 @@ Usage:
   uv run python scripts/check_wallet.py
 """
 
-import asyncio
 import os
 import sys
 
@@ -67,7 +66,7 @@ def main():
     )
     decimals = usdc.functions.decimals().call()
     balance = usdc.functions.balanceOf(Web3.to_checksum_address(wallet)).call()
-    print(f"   USDC balance: {balance / (10 ** decimals):.2f} USDC")
+    print(f"   USDC balance: {balance / (10**decimals):.2f} USDC")
     print(f"   (USDC contract: {usdc_address})")
 
 

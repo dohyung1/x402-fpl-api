@@ -16,7 +16,7 @@ POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
 INJURY_STATUSES = {"i", "d", "s", "u"}
 
 # Multipliers for expected-points projection per fixture
-HOME_BOOST = 1.15   # 15% boost for home fixtures
+HOME_BOOST = 1.15  # 15% boost for home fixtures
 AWAY_PENALTY = 0.95  # 5% penalty for away fixtures
 
 # FDR multipliers: easier fixture = more expected points
@@ -30,7 +30,9 @@ FDR_MULTIPLIER = {
 
 
 def _build_multi_gw_fixture_map(
-    fixtures: list, start_gw: int, num_gws: int,
+    fixtures: list,
+    start_gw: int,
+    num_gws: int,
 ) -> dict[int, list[dict]]:
     """
     Map team_id -> list of fixture dicts across multiple gameweeks.
@@ -47,18 +49,22 @@ def _build_multi_gw_fixture_map(
         home_id = fix["team_h"]
         away_id = fix["team_a"]
 
-        fixture_map.setdefault(home_id, []).append({
-            "gameweek": gw,
-            "fdr": fix["team_h_difficulty"],
-            "is_home": True,
-            "opponent": away_id,
-        })
-        fixture_map.setdefault(away_id, []).append({
-            "gameweek": gw,
-            "fdr": fix["team_a_difficulty"],
-            "is_home": False,
-            "opponent": home_id,
-        })
+        fixture_map.setdefault(home_id, []).append(
+            {
+                "gameweek": gw,
+                "fdr": fix["team_h_difficulty"],
+                "is_home": True,
+                "opponent": away_id,
+            }
+        )
+        fixture_map.setdefault(away_id, []).append(
+            {
+                "gameweek": gw,
+                "fdr": fix["team_a_difficulty"],
+                "is_home": False,
+                "opponent": home_id,
+            }
+        )
 
     return fixture_map
 
@@ -98,19 +104,24 @@ def _project_expected_points(player: dict, fixtures: list[dict]) -> float:
 
 
 def _build_player_summary(
-    player: dict, team_name: str, fixtures: list[dict],
-    expected_pts: float, teams_by_id: dict,
+    player: dict,
+    team_name: str,
+    fixtures: list[dict],
+    expected_pts: float,
+    teams_by_id: dict,
 ) -> dict:
     """Build a summary dict for a player in the analysis."""
     fixture_details = []
     for fix in sorted(fixtures, key=lambda f: f["gameweek"]):
         opp = teams_by_id.get(fix["opponent"], {}).get("short_name", "?")
         venue = "H" if fix["is_home"] else "A"
-        fixture_details.append({
-            "gameweek": fix["gameweek"],
-            "opponent": f"{opp}({venue})",
-            "fdr": fix["fdr"],
-        })
+        fixture_details.append(
+            {
+                "gameweek": fix["gameweek"],
+                "opponent": f"{opp}({venue})",
+                "fdr": fix["fdr"],
+            }
+        )
 
     return {
         "id": player["id"],
@@ -210,10 +221,18 @@ async def analyze_hit(
         "gameweek": next_gw,
         "gameweeks_projected": gameweeks_ahead,
         "player_out": _build_player_summary(
-            player_out, out_team, out_fixtures, out_expected, teams_by_id,
+            player_out,
+            out_team,
+            out_fixtures,
+            out_expected,
+            teams_by_id,
         ),
         "player_in": _build_player_summary(
-            player_in, in_team, in_fixtures, in_expected, teams_by_id,
+            player_in,
+            in_team,
+            in_fixtures,
+            in_expected,
+            teams_by_id,
         ),
         "analysis": {
             "player_out_expected_points": out_expected,

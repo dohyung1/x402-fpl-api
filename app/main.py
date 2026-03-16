@@ -19,8 +19,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 app = FastAPI(
     title="x402 FPL Intelligence API",
     description=(
-        "AI-agent-native Fantasy Premier League intelligence. "
-        "Pay per query with USDC on Base via the x402 protocol."
+        "AI-agent-native Fantasy Premier League intelligence. Pay per query with USDC on Base via the x402 protocol."
     ),
     version="1.0.0",
     docs_url="/docs",

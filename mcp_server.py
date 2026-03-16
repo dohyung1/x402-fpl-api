@@ -44,6 +44,7 @@ mcp = FastMCP(
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _error(message: str) -> dict:
     """Return a structured error dict that MCP clients can detect via isError."""
     return {"isError": True, "error": message}
@@ -82,6 +83,7 @@ async def captain_pick(gameweek: int | None = None) -> dict:
         return _error(err)
     try:
         from app.algorithms.captain import get_captain_picks
+
         return await get_captain_picks(gameweek=gameweek)
     except Exception as exc:
         logger.exception("captain_pick failed")
@@ -109,6 +111,7 @@ async def differential_finder(
         return _error("max_ownership_pct must be between 0.1 and 100.")
     try:
         from app.algorithms.differentials import get_differentials
+
         return await get_differentials(max_ownership_pct=max_ownership_pct, gameweek=gameweek)
     except Exception as exc:
         logger.exception("differential_finder failed")
@@ -135,6 +138,7 @@ async def fixture_outlook(
         return _error("Position must be one of: GKP, DEF, MID, FWD.")
     try:
         from app.algorithms.fixtures import get_fixture_outlook
+
         return await get_fixture_outlook(gameweeks_ahead=gameweeks_ahead, position=position)
     except Exception as exc:
         logger.exception("fixture_outlook failed")
@@ -153,6 +157,7 @@ async def price_predictions() -> dict:
     """
     try:
         from app.algorithms.prices import get_price_predictions
+
         return await get_price_predictions()
     except Exception as exc:
         logger.exception("price_predictions failed")
@@ -180,6 +185,7 @@ async def transfer_suggestions(
         return _error(err)
     try:
         from app.algorithms.transfers import get_transfer_suggestions
+
         return await get_transfer_suggestions(
             team_id=team_id,
             free_transfers=max(1, min(5, free_transfers)),
@@ -212,6 +218,7 @@ async def player_comparison(player_names: list[str], gameweeks_ahead: int = 5) -
         return _error("Can compare at most 4 players at once.")
     try:
         from app.algorithms.compare import compare_players
+
         return await compare_players(
             player_names=player_names,
             gameweeks_ahead=max(1, min(10, gameweeks_ahead)),
@@ -237,6 +244,7 @@ async def live_points(team_id: int) -> dict:
         return _error(err)
     try:
         from app.algorithms.live import get_live_points
+
         return await get_live_points(team_id=team_id)
     except Exception as exc:
         logger.exception("live_points failed")
@@ -269,22 +277,26 @@ async def fpl_manager_hub(
 
     try:
         return await _fpl_manager_hub_impl(team_id, gameweeks_ahead)
-    except Exception as exc:
+    except Exception:
         logger.exception("fpl_manager_hub failed for team %s", team_id)
         return _error(f"Failed to analyze team {team_id}. Check that the team ID is correct and try again.")
 
 
 async def _fpl_manager_hub_impl(team_id: int, gameweeks_ahead: int) -> dict:
-    from app.fpl_client import (
-        get_bootstrap, get_fixtures, get_current_gameweek,
-        get_next_gameweek, get_team_picks, get_team_history,
-        get_manager_status,
-    )
     from app.algorithms.captain import get_captain_picks
-    from app.algorithms.transfers import get_transfer_suggestions
     from app.algorithms.differentials import get_differentials
     from app.algorithms.fixtures import get_fixture_outlook
     from app.algorithms.prices import get_price_predictions
+    from app.algorithms.transfers import get_transfer_suggestions
+    from app.fpl_client import (
+        get_bootstrap,
+        get_current_gameweek,
+        get_fixtures,
+        get_manager_status,
+        get_next_gameweek,
+        get_team_history,
+        get_team_picks,
+    )
 
     # Fetch base data to get manager status
     bootstrap, fixtures = await asyncio.gather(get_bootstrap(), get_fixtures())
@@ -317,7 +329,7 @@ async def _fpl_manager_hub_impl(team_id: int, gameweeks_ahead: int) -> dict:
     # Build squad overview using element IDs (Fix 8: no web_name collisions)
     players_by_id = {p["id"]: p for p in bootstrap["elements"]}
     teams_by_id = {t["id"]: t for t in bootstrap["teams"]}
-    from app.algorithms.captain import POSITION_MAP, INJURY_STATUSES, _build_fixture_map, _score_player
+    from app.algorithms.captain import INJURY_STATUSES, POSITION_MAP, _build_fixture_map, _score_player
 
     fixture_map = _build_fixture_map(fixtures, next_gw)
 
@@ -352,28 +364,30 @@ async def _fpl_manager_hub_impl(team_id: int, gameweeks_ahead: int) -> dict:
             venue = "?"
             fdr = None
 
-        squad.append({
-            "slot": pick["position"],
-            "starter": pick["position"] <= 11,
-            "element_id": element_id,  # Fix 8: include element ID
-            "name": p["web_name"],
-            "team": team.get("short_name", "?"),
-            "position": POSITION_MAP.get(p["element_type"], "?"),
-            "cost": cost,
-            "form": float(p.get("form") or 0),
-            "points_per_game": float(p.get("points_per_game") or 0),
-            "total_points": p.get("total_points", 0),
-            "ict_index": float(p.get("ict_index") or 0),
-            "is_captain": pick.get("is_captain", False),
-            "is_vice_captain": pick.get("is_vice_captain", False),
-            "opponent": opponent_str,
-            "venue": venue,
-            "fdr": fdr,
-            "captain_score": captain_score,
-            "status": p.get("status", "a"),
-            "minutes": p.get("minutes", 0),
-            "selected_by_pct": float(p.get("selected_by_percent") or 0),
-        })
+        squad.append(
+            {
+                "slot": pick["position"],
+                "starter": pick["position"] <= 11,
+                "element_id": element_id,  # Fix 8: include element ID
+                "name": p["web_name"],
+                "team": team.get("short_name", "?"),
+                "position": POSITION_MAP.get(p["element_type"], "?"),
+                "cost": cost,
+                "form": float(p.get("form") or 0),
+                "points_per_game": float(p.get("points_per_game") or 0),
+                "total_points": p.get("total_points", 0),
+                "ict_index": float(p.get("ict_index") or 0),
+                "is_captain": pick.get("is_captain", False),
+                "is_vice_captain": pick.get("is_vice_captain", False),
+                "opponent": opponent_str,
+                "venue": venue,
+                "fdr": fdr,
+                "captain_score": captain_score,
+                "status": p.get("status", "a"),
+                "minutes": p.get("minutes", 0),
+                "selected_by_pct": float(p.get("selected_by_percent") or 0),
+            }
+        )
 
     # Squad health (using element IDs for lookups)
     injured = [s for s in squad if s["status"] in INJURY_STATUSES]
@@ -386,22 +400,21 @@ async def _fpl_manager_hub_impl(team_id: int, gameweeks_ahead: int) -> dict:
         p = players_by_id.get(s["element_id"], {})
         net = p.get("transfers_in_event", 0) - p.get("transfers_out_event", 0)
         if net < -50_000:
-            price_risks.append({
-                "name": s["name"],
-                "element_id": s["element_id"],
-                "net_transfers": net,
-                "risk": "Likely to fall",
-            })
+            price_risks.append(
+                {
+                    "name": s["name"],
+                    "element_id": s["element_id"],
+                    "net_transfers": net,
+                    "risk": "Likely to fall",
+                }
+            )
 
     # Season history
     season = history_data.get("current", [])
     total_points = sum(gw.get("points", 0) for gw in season)
     best_gw = max(season, key=lambda g: g.get("points", 0)) if season else {}
     worst_gw = min(season, key=lambda g: g.get("points", 0)) if season else {}
-    chips_used = [
-        {"chip": c["name"], "gameweek": c["event"]}
-        for c in history_data.get("chips", [])
-    ]
+    chips_used = [{"chip": c["name"], "gameweek": c["event"]} for c in history_data.get("chips", [])]
 
     return {
         "team_id": team_id,
@@ -419,9 +432,16 @@ async def _fpl_manager_hub_impl(team_id: int, gameweeks_ahead: int) -> dict:
         },
         "squad": squad,
         "squad_health": {
-            "injured_or_doubtful": [{"name": s["name"], "element_id": s["element_id"], "status": s["status"]} for s in injured],
-            "poor_form_starters": [{"name": s["name"], "element_id": s["element_id"], "form": s["form"]} for s in poor_form],
-            "tough_fixtures_this_gw": [{"name": s["name"], "element_id": s["element_id"], "opponent": s["opponent"], "fdr": s["fdr"]} for s in tough_fixtures],
+            "injured_or_doubtful": [
+                {"name": s["name"], "element_id": s["element_id"], "status": s["status"]} for s in injured
+            ],
+            "poor_form_starters": [
+                {"name": s["name"], "element_id": s["element_id"], "form": s["form"]} for s in poor_form
+            ],
+            "tough_fixtures_this_gw": [
+                {"name": s["name"], "element_id": s["element_id"], "opponent": s["opponent"], "fdr": s["fdr"]}
+                for s in tough_fixtures
+            ],
         },
         # Fix 7: Use results from existing algorithm functions instead of duplicating logic
         "captain_recommendation": captain_result["picks"],
@@ -465,6 +485,7 @@ async def is_hit_worth_it(
         return _error("player_out_id and player_in_id must be different players.")
     try:
         from app.algorithms.hit_analyzer import analyze_hit
+
         return await analyze_hit(
             player_out_id=player_out_id,
             player_in_id=player_in_id,
@@ -493,6 +514,7 @@ async def chip_strategy(team_id: int) -> dict:
         return _error(err)
     try:
         from app.algorithms.chips import get_chip_strategy
+
         return await get_chip_strategy(team_id=team_id)
     except Exception as exc:
         logger.exception("chip_strategy failed")
@@ -520,6 +542,7 @@ async def squad_scout(team_id: int) -> dict:
         return _error(err)
     try:
         from app.algorithms.scout import get_squad_scout
+
         return await get_squad_scout(team_id=team_id)
     except Exception as exc:
         logger.exception("squad_scout failed")
@@ -534,8 +557,9 @@ async def squad_scout(team_id: int) -> dict:
 @mcp.resource("fpl://status")
 async def gameweek_status() -> str:
     """Current FPL gameweek status — which GW is active, deadlines, and season progress."""
-    from app.fpl_client import get_bootstrap, get_current_gameweek, get_next_gameweek
     import json
+
+    from app.fpl_client import get_bootstrap, get_current_gameweek, get_next_gameweek
 
     bootstrap = await get_bootstrap()
     current_gw = get_current_gameweek(bootstrap)
@@ -547,22 +571,26 @@ async def gameweek_status() -> str:
 
     finished_gws = sum(1 for e in events if e.get("finished"))
 
-    return json.dumps({
-        "current_gameweek": current_gw,
-        "next_gameweek": next_gw,
-        "current_gw_finished": current_event.get("finished", False),
-        "next_deadline": next_event.get("deadline_time", "unknown"),
-        "gameweeks_finished": finished_gws,
-        "gameweeks_remaining": 38 - finished_gws,
-        "season_progress_pct": round(finished_gws / 38 * 100, 1),
-    }, indent=2)
+    return json.dumps(
+        {
+            "current_gameweek": current_gw,
+            "next_gameweek": next_gw,
+            "current_gw_finished": current_event.get("finished", False),
+            "next_deadline": next_event.get("deadline_time", "unknown"),
+            "gameweeks_finished": finished_gws,
+            "gameweeks_remaining": 38 - finished_gws,
+            "season_progress_pct": round(finished_gws / 38 * 100, 1),
+        },
+        indent=2,
+    )
 
 
 @mcp.resource("fpl://teams")
 async def team_list() -> str:
     """All 20 Premier League teams with short names and IDs."""
-    from app.fpl_client import get_bootstrap
     import json
+
+    from app.fpl_client import get_bootstrap
 
     bootstrap = await get_bootstrap()
     teams = [

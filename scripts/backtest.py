@@ -22,13 +22,13 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from app.fpl_client import get_bootstrap, get_fixtures, get_live_points  # noqa: E402
 from app.algorithms.captain import (  # noqa: E402
-    WEIGHTS,
     POSITION_MAP,
+    WEIGHTS,
     _build_fixture_map,
     _score_player,
 )
+from app.fpl_client import get_bootstrap, get_fixtures, get_live_points  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Disk cache — avoid hammering the FPL API across repeated backtest runs
@@ -86,16 +86,13 @@ async def cached_live_points(gw: int) -> dict:
 # Core backtest logic
 # ---------------------------------------------------------------------------
 
+
 def get_finished_gameweeks(bootstrap: dict) -> list[int]:
     """Return sorted list of finished gameweek IDs."""
-    return sorted(
-        gw["id"] for gw in bootstrap["events"] if gw["finished"]
-    )
+    return sorted(gw["id"] for gw in bootstrap["events"] if gw["finished"])
 
 
-def actual_top_scorers(
-    live_data: dict, bootstrap: dict, n: int = 20
-) -> list[dict]:
+def actual_top_scorers(live_data: dict, bootstrap: dict, n: int = 20) -> list[dict]:
     """
     From the live endpoint, extract the top N scorers for the gameweek.
     Returns list of {id, web_name, team, position, actual_points}.
@@ -115,21 +112,21 @@ def actual_top_scorers(
         if minutes == 0:
             continue
         team = teams_by_id.get(player["team"], {})
-        scored.append({
-            "id": pid,
-            "web_name": player["web_name"],
-            "team": team.get("short_name", "?"),
-            "position": POSITION_MAP.get(player["element_type"], "?"),
-            "actual_points": points,
-        })
+        scored.append(
+            {
+                "id": pid,
+                "web_name": player["web_name"],
+                "team": team.get("short_name", "?"),
+                "position": POSITION_MAP.get(player["element_type"], "?"),
+                "actual_points": points,
+            }
+        )
 
     scored.sort(key=lambda x: x["actual_points"], reverse=True)
     return scored[:n]
 
 
-def run_algorithm_for_gw(
-    bootstrap: dict, fixtures: list, gameweek: int, top_n: int = 5
-) -> list[dict]:
+def run_algorithm_for_gw(bootstrap: dict, fixtures: list, gameweek: int, top_n: int = 5) -> list[dict]:
     """
     Run the captain scoring algorithm against a given gameweek.
     Returns ranked list of {id, web_name, team, position, algo_score}.
@@ -148,13 +145,15 @@ def run_algorithm_for_gw(
     results = []
     for score, player in scored[:top_n]:
         team = teams_by_id.get(player["team"], {})
-        results.append({
-            "id": player["id"],
-            "web_name": player["web_name"],
-            "team": team.get("short_name", "?"),
-            "position": POSITION_MAP.get(player["element_type"], "?"),
-            "algo_score": score,
-        })
+        results.append(
+            {
+                "id": player["id"],
+                "web_name": player["web_name"],
+                "team": team.get("short_name", "?"),
+                "position": POSITION_MAP.get(player["element_type"], "?"),
+                "algo_score": score,
+            }
+        )
     return results
 
 
@@ -170,6 +169,7 @@ def find_haaland_id(bootstrap: dict) -> int | None:
 # ---------------------------------------------------------------------------
 # Weight suggestion engine
 # ---------------------------------------------------------------------------
+
 
 def compute_feature_correlations(
     bootstrap: dict,
@@ -267,10 +267,7 @@ def compute_feature_correlations(
                 continue
 
             # Spearman: 1 - 6*sum(d^2) / (n*(n^2-1))
-            d_sq_sum = sum(
-                (factor_rank[pid] - actual_rank.get(pid, n)) ** 2
-                for pid, _ in values
-            )
+            d_sq_sum = sum((factor_rank[pid] - actual_rank.get(pid, n)) ** 2 for pid, _ in values)
             rho = 1.0 - (6.0 * d_sq_sum) / (n * (n * n - 1))
             factor_rank_diffs[factor].append(rho)
 
@@ -298,7 +295,7 @@ def suggest_weights(correlations: dict[str, float]) -> dict[str, float]:
         return dict(WEIGHTS)
 
     max_corr = max(vals)
-    min_corr = min(vals) if min(vals) > 0 else 0
+    min(vals) if min(vals) > 0 else 0
 
     suggested = {}
     for factor, current_weight in WEIGHTS.items():
@@ -325,6 +322,7 @@ def suggest_weights(correlations: dict[str, float]) -> dict[str, float]:
 # ---------------------------------------------------------------------------
 # Main backtest runner
 # ---------------------------------------------------------------------------
+
 
 async def run_backtest(
     gw_start: int | None = None,
@@ -384,7 +382,7 @@ async def run_backtest(
         # Actual top scorers
         top_actual = actual_top_scorers(live, bootstrap, n=50)
         actual_ids_ranked = [p["id"] for p in top_actual]
-        actual_points_by_id = {p["id"]: p["actual_points"] for p in top_actual}
+        {p["id"]: p["actual_points"] for p in top_actual}
 
         # Also build full actual points map for all players
         full_actual = {}
@@ -440,10 +438,7 @@ async def run_backtest(
                 haaland_counted += 1
 
         # Top 3 actual scorers for display
-        top3_display = ", ".join(
-            f"{p['web_name']}({p['actual_points']}pts)"
-            for p in top_actual[:3]
-        )
+        ", ".join(f"{p['web_name']}({p['actual_points']}pts)" for p in top_actual[:3])
 
         gw_result = {
             "gameweek": gw,
@@ -455,10 +450,7 @@ async def run_backtest(
             "in_top_3": is_top3,
             "in_top_5": is_top5,
             "in_top_10": is_top10,
-            "actual_top_3": [
-                {"name": p["web_name"], "points": p["actual_points"]}
-                for p in top_actual[:3]
-            ],
+            "actual_top_3": [{"name": p["web_name"], "points": p["actual_points"]} for p in top_actual[:3]],
             "haaland_points": haaland_pts,
             "haaland_rank": haaland_rank,
             "all_algo_picks": [
@@ -508,9 +500,7 @@ async def run_backtest(
     # Weight suggestions
     if do_suggest_weights:
         print("\n--- Weight Correlation Analysis ---\n")
-        correlations = compute_feature_correlations(
-            bootstrap, fixtures, all_live, finished
-        )
+        correlations = compute_feature_correlations(bootstrap, fixtures, all_live, finished)
         new_weights = suggest_weights(correlations)
 
         print(f"  {'Factor':<25} {'Correlation':>12} {'Current Wt':>12} {'Suggested Wt':>12}")
@@ -554,9 +544,7 @@ def _print_results_table(gw_results: list[dict], summary: dict) -> None:
     print(sep)
 
     for r in gw_results:
-        top3_str = ", ".join(
-            f"{p['name']}({p['points']})" for p in r["actual_top_3"]
-        )
+        top3_str = ", ".join(f"{p['name']}({p['points']})" for p in r["actual_top_3"])
         t3 = "Y" if r["in_top_3"] else "-"
         t5 = "Y" if r["in_top_5"] else "-"
         print(
@@ -593,10 +581,9 @@ def _print_results_table(gw_results: list[dict], summary: dict) -> None:
 # CLI entry point
 # ---------------------------------------------------------------------------
 
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Backtest the captain pick algorithm against finished gameweeks."
-    )
+    parser = argparse.ArgumentParser(description="Backtest the captain pick algorithm against finished gameweeks.")
     parser.add_argument(
         "--gameweeks",
         type=str,
@@ -633,6 +620,7 @@ def main() -> None:
 
     if args.clear_cache and CACHE_DIR.exists():
         import shutil
+
         shutil.rmtree(CACHE_DIR)
         print("Backtest cache cleared.\n")
 

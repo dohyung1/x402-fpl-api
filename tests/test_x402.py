@@ -5,9 +5,10 @@ These tests use httpx TestClient and mock on-chain verification
 so we don't need a live Base Sepolia connection.
 """
 
-import pytest
 import sqlite3
 from unittest.mock import MagicMock, patch
+
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -43,6 +44,7 @@ def clear_used_hashes():
 # Health / root -- should never require payment
 # ---------------------------------------------------------------------------
 
+
 def test_health_no_payment():
     resp = client.get("/health")
     assert resp.status_code == 200
@@ -60,6 +62,7 @@ def test_root_no_payment():
 # ---------------------------------------------------------------------------
 # 402 -- no payment header
 # ---------------------------------------------------------------------------
+
 
 def test_captain_pick_requires_payment():
     resp = client.get("/api/fpl/captain-pick")
@@ -99,6 +102,7 @@ def test_live_points_requires_payment():
 # 402 payment details structure
 # ---------------------------------------------------------------------------
 
+
 def test_402_response_has_correct_price_captain():
     resp = client.get("/api/fpl/captain-pick")
     body = resp.json()
@@ -120,6 +124,7 @@ def test_402_response_has_correct_price_differentials():
 # ---------------------------------------------------------------------------
 # Payment verification -- mocked on-chain calls
 # ---------------------------------------------------------------------------
+
 
 def _mock_receipt(to_wallet: str, amount: int, block: int = 100):
     """Build a minimal mock receipt with a USDC Transfer event."""
@@ -159,8 +164,10 @@ def test_valid_payment_passes_middleware():
         amount=2_000,  # captain-pick price
     )
 
-    with patch("app.x402._get_web3", return_value=mock_w3), \
-         patch("app.x402.Web3.to_checksum_address", return_value=settings.usdc_contract_address):
+    with (
+        patch("app.x402._get_web3", return_value=mock_w3),
+        patch("app.x402.Web3.to_checksum_address", return_value=settings.usdc_contract_address),
+    ):
         resp = client.get(
             "/api/fpl/captain-pick",
             headers={"X-Payment": FAKE_TX},
@@ -178,8 +185,10 @@ def test_replay_attack_rejected():
         amount=2_000,
     )
 
-    with patch("app.x402._get_web3", return_value=mock_w3), \
-         patch("app.x402.Web3.to_checksum_address", return_value=settings.usdc_contract_address):
+    with (
+        patch("app.x402._get_web3", return_value=mock_w3),
+        patch("app.x402.Web3.to_checksum_address", return_value=settings.usdc_contract_address),
+    ):
         # First use succeeds (passes middleware)
         resp1 = client.get("/api/fpl/captain-pick", headers={"X-Payment": FAKE_TX})
         assert resp1.status_code != 402
@@ -199,9 +208,11 @@ def test_insufficient_payment_rejected():
         amount=1,  # way too low
     )
 
-    with patch("app.x402._get_web3", return_value=mock_w3), \
-         patch("app.x402.Web3.to_checksum_address", return_value=settings.usdc_contract_address), \
-         patch("app.x402.settings") as mock_settings:
+    with (
+        patch("app.x402._get_web3", return_value=mock_w3),
+        patch("app.x402.Web3.to_checksum_address", return_value=settings.usdc_contract_address),
+        patch("app.x402.settings") as mock_settings,
+    ):
         mock_settings.test_mode = False
         mock_settings.payment_wallet_address = settings.payment_wallet_address
         mock_settings.usdc_contract_address = settings.usdc_contract_address
@@ -216,18 +227,16 @@ def test_insufficient_payment_rejected():
 def test_unknown_tx_rejected():
     """A tx hash that doesn't exist on-chain is rejected."""
     from web3.exceptions import TransactionNotFound
+
     from app.config import settings
 
     mock_w3 = MagicMock()
     mock_w3.is_connected.return_value = True
     mock_w3.eth.block_number = 100
     # web3 v7: TransactionNotFound requires a message keyword argument
-    mock_w3.eth.get_transaction_receipt.side_effect = TransactionNotFound(
-        message="Transaction not found"
-    )
+    mock_w3.eth.get_transaction_receipt.side_effect = TransactionNotFound(message="Transaction not found")
 
-    with patch("app.x402._get_web3", return_value=mock_w3), \
-         patch("app.x402.settings") as mock_settings:
+    with patch("app.x402._get_web3", return_value=mock_w3), patch("app.x402.settings") as mock_settings:
         mock_settings.test_mode = False
         mock_settings.payment_wallet_address = settings.payment_wallet_address
         mock_settings.usdc_contract_address = settings.usdc_contract_address

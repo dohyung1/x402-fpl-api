@@ -30,10 +30,10 @@ settings = Settings()
 # Endpoint pricing in USDC (6 decimal places = microdollars)
 # $0.001 = 1_000 units, $0.002 = 2_000 units, $0.005 = 5_000 units
 ENDPOINT_PRICES: dict[str, int] = {
-    "/api/fpl/captain-pick":     2_000,   # $0.002
-    "/api/fpl/transfer-suggest": 5_000,   # $0.005
-    "/api/fpl/differentials":    1_000,   # $0.001
-    "/api/fpl/fixture-outlook":  1_000,   # $0.001
+    "/api/fpl/captain-pick": 2_000,  # $0.002
+    "/api/fpl/transfer-suggest": 5_000,  # $0.005
+    "/api/fpl/differentials": 1_000,  # $0.001
+    "/api/fpl/fixture-outlook": 1_000,  # $0.001
     "/api/fpl/price-predictions": 2_000,  # $0.002
-    "/api/fpl/live-points":      1_000,   # $0.001
+    "/api/fpl/live-points": 1_000,  # $0.001
 }

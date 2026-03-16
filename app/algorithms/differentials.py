@@ -13,8 +13,8 @@ differential_score =
 DGW support: fixture difficulty is the average across all fixtures in the GW.
 """
 
-from app.fpl_client import get_bootstrap, get_next_gameweek, get_fixtures
 from app.algorithms.captain import _build_fixture_map
+from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek
 
 POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
 
@@ -30,13 +30,7 @@ def _differential_score(player: dict, fixtures: list[dict] | None, ownership_pct
     else:
         avg_fdr = 3
 
-    score = (
-        form * 3.0
-        + ppg * 1.0
-        - avg_fdr * 0.5
-        + ict * 0.01
-        - ownership_pct * 0.1
-    )
+    score = form * 3.0 + ppg * 1.0 - avg_fdr * 0.5 + ict * 0.01 - ownership_pct * 0.1
 
     # DGW bonus: more fixtures = more points potential
     if fixtures and len(fixtures) > 1:
@@ -57,6 +51,7 @@ async def get_differentials(
     Uses the next gameweek by default (what managers are prepping for).
     """
     import asyncio
+
     bootstrap, fixtures = await asyncio.gather(get_bootstrap(), get_fixtures())
 
     if gameweek is None:
@@ -90,11 +85,13 @@ async def get_differentials(
             for fix in player_fixtures:
                 opponent_id = fix["opponent"]
                 opponent = teams.get(opponent_id, {}).get("short_name", "?")
-                fixture_entries.append({
-                    "opponent": opponent,
-                    "venue": "Home" if fix["is_home"] else "Away",
-                    "fdr": fix["fdr"],
-                })
+                fixture_entries.append(
+                    {
+                        "opponent": opponent,
+                        "venue": "Home" if fix["is_home"] else "Away",
+                        "fdr": fix["fdr"],
+                    }
+                )
             fixture_info = {
                 "fixtures": fixture_entries,
                 "gameweek": gameweek,

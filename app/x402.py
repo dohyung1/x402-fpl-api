@@ -189,8 +189,7 @@ async def verify_payment(tx_hash: str, path: str) -> None:
         confirmations = current_block - tx_block
         if confirmations < settings.required_confirmations:
             raise PaymentVerificationError(
-                f"Transaction has {confirmations} confirmation(s); "
-                f"{settings.required_confirmations} required."
+                f"Transaction has {confirmations} confirmation(s); {settings.required_confirmations} required."
             )
 
         # Parse Transfer events from the USDC contract
@@ -206,11 +205,12 @@ async def verify_payment(tx_hash: str, path: str) -> None:
         if paid_amount < required_amount:
             logger.warning(
                 "Insufficient payment for %s: required %d, received %d (tx: %s)",
-                path, required_amount, paid_amount, tx_hash,
+                path,
+                required_amount,
+                paid_amount,
+                tx_hash,
             )
-            raise PaymentVerificationError(
-                "Insufficient payment. Check the required amount and retry."
-            )
+            raise PaymentVerificationError("Insufficient payment. Check the required amount and retry.")
 
         logger.info("Payment accepted: %s (%.4f USDC) for %s", tx_hash, paid_amount / 1_000_000, path)
 
