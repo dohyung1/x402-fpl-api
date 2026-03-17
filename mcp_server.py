@@ -559,6 +559,35 @@ async def rival_tracker(league_id: int, team_id: int) -> dict:
         return _error("Failed to analyze rivals. Check that the league ID and team ID are correct and try again.")
 
 
+@mcp.tool()
+async def league_analyzer(league_id: int) -> dict:
+    """
+    Predict who will win a mini-league based on current form, squad quality, and chips remaining.
+
+    USE THIS WHEN the user asks: "Who's going to win my league?", "League predictions",
+    "Who's the favourite?", "Analyze league standings", "Win probability", or any question
+    about league-wide chances WITHOUT needing a specific team ID.
+
+    Does NOT require the user's team ID — just the league ID. Analyzes the top managers
+    in the league and calculates win probability for each based on: points gap, squad quality,
+    chips remaining, recent momentum, team value, and injury concerns.
+
+    The league ID is in the mini-league URL: fantasy.premierleague.com/leagues/LEAGUE_ID/standings/c
+
+    Args:
+        league_id: Mini-league ID from the league URL.
+    """
+    if err := _validate_league_id(league_id):
+        return _error(err)
+    try:
+        from app.algorithms.league_analyzer import analyze_league
+
+        return await analyze_league(league_id=league_id)
+    except Exception:
+        logger.exception("league_analyzer failed")
+        return _error("Failed to analyze league. Check that the league ID is correct and try again.")
+
+
 # ---------------------------------------------------------------------------
 # MCP Prompt Templates
 @mcp.tool()

@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0] - 2026-03-17
+
+### Added
+- `league_analyzer` MCP tool — predict who will win a mini-league
+  - Win probability for each top manager based on points gap, squad quality, chips remaining, momentum, team value, and injuries
+  - Only requires league ID — no team ID needed
+  - Narrative insights: title race closeness, chip advantages, hot streaks, injury concerns
+
 ## [0.7.1] - 2026-03-17
 
 ### Fixed

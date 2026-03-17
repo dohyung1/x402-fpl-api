@@ -77,7 +77,8 @@ https://fantasy.premierleague.com/entry/YOUR_TEAM_ID/event/<gw>
 | `fixture_outlook` | Teams ranked by upcoming fixture difficulty + best players to target |
 | `price_predictions` | Players likely to rise or fall in price tonight |
 | `live_points` | Live score, projected bonus, and auto-sub scenarios |
-| `rival_tracker` | **NEW.** Mini-league rival analysis — compare squads, find differentials, predict rival moves, get strategies to overtake |
+| `rival_tracker` | Mini-league rival analysis — compare squads, find differentials, predict rival moves, get strategies to overtake |
+| `league_analyzer` | **NEW.** Who's going to win your league? Win probabilities based on form, squad quality, chips, momentum |
 | `squad_scout` | Deep scout using FPL's hidden data — expected points, blank GW warnings, set piece duties, suspension risks |
 
 ## Example Prompts
@@ -92,6 +93,7 @@ Try these in Claude Desktop:
 - "Find me some differentials under 5% ownership"
 - "Which teams have the easiest fixtures for the next 6 weeks?"
 - "Analyze my mini-league 1189955 for team 5456980 — how do I beat my rivals?"
+- "Who's going to win mini-league 1189955?"
 
 ## How It Works
 
