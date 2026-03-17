@@ -121,19 +121,21 @@ def _build_fixture_map(fixtures: list, gameweek: int, teams_by_id: dict | None =
         home_fdr = fix["team_h_difficulty"]
         away_fdr = fix["team_a_difficulty"]
 
-        # Blend FDR with team strength for more accurate difficulty
+        # Blend FDR with opponent defensive strength for more accurate difficulty.
+        # For captaincy (scoring potential), what matters is how WEAK the opponent's
+        # defence is, not how strong their attack is. Lower defensive strength = easier
+        # fixture for the attacking team's players.
         if teams_by_id:
             away_team = teams_by_id.get(away_id, {})
             home_team = teams_by_id.get(home_id, {})
 
-            # For home team: difficulty = opponent's away attack strength
-            # Higher opponent attack = harder fixture
-            opp_attack_away = away_team.get("strength_attack_away", 1200)
-            home_fdr = _blend_fdr(home_fdr, opp_attack_away)
+            # For home team: opponent's away defensive weakness determines scoring ease
+            opp_defence_away = away_team.get("strength_defence_away", 1200)
+            home_fdr = _blend_fdr(home_fdr, opp_defence_away)
 
-            # For away team: difficulty = opponent's home attack strength
-            opp_attack_home = home_team.get("strength_attack_home", 1200)
-            away_fdr = _blend_fdr(away_fdr, opp_attack_home)
+            # For away team: opponent's home defensive weakness determines scoring ease
+            opp_defence_home = home_team.get("strength_defence_home", 1200)
+            away_fdr = _blend_fdr(away_fdr, opp_defence_home)
 
         # Home team
         fixture_map.setdefault(home_id, []).append({"fdr": home_fdr, "is_home": True, "opponent": away_id})

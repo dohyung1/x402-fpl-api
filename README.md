@@ -105,7 +105,7 @@ https://fantasy.premierleague.com/leagues/YOUR_LEAGUE_ID/standings/c
 
 ## How It Works
 
-FPL Intelligence connects to the official [FPL API](https://fantasy.premierleague.com/api/bootstrap-static/) — the same free, public data that powers the FPL website. All data is real-time.
+FPL Intelligence connects to the official [FPL API](https://fantasy.premierleague.com/api/bootstrap-static/) — the same free, public data that powers the FPL website. All data is real-time. See the full [FPL API reference on Postman](https://www.postman.com/fplassist/fpl-assist/collection/zqlmv01/fantasy-premier-league-api?sideView=agentMode) for endpoint documentation.
 
 The server runs locally on your machine and talks to Claude Desktop via [MCP](https://modelcontextprotocol.io). No API keys, no accounts, no data leaves your machine except FPL API calls.
 

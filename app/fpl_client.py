@@ -194,11 +194,17 @@ async def get_manager_status(team_id: int, bootstrap: dict) -> dict:
     chips = history_data.get("chips", [])
     chip_this_gw = next((c["name"] for c in chips if c["event"] == current_gw), None)
 
+    # 2025/26 rule: managers can bank up to 5 free transfers (1 base + 4 rolled).
+    # FPL API game_settings.max_extra_free_transfers = 4.
+    max_free_transfers = 5
     if chip_this_gw in ("wildcard", "freehit"):
         free_transfers = 1
     elif event_transfers == 0:
-        # Check if previous GW also had 0 transfers (can't stack beyond 2)
-        free_transfers = 2
+        # Rolled over — estimate based on entry_history limit field if available,
+        # otherwise assume +1 banked (up to max). The actual count comes from
+        # entry_history.event_transfers_cost and bank logic, but a simple heuristic
+        # is: previous FTs + 1 (capped at max). Without prior GW data, assume 2.
+        free_transfers = min(max_free_transfers, 2)
     else:
         free_transfers = 1
 
