@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-03-16
+
+### Added
+- DGW/BGW prediction engine — detects postponed fixtures (`event: null`) from FPL API to predict future Double Gameweeks
+- Community intelligence scraper (`dgw_intel.py`) — scrapes premierleague.com and AllAboutFPL for confirmed/predicted DGW and BGW data
+- Team alias matching for 20+ PL teams (handles "Man City", "Spurs", "Wolves", etc.)
+- Predicted DGW data merged into chip strategy scoring (TC, BB, FH all benefit)
+- `pending_dgws` section in chip strategy output — shows teams with postponed fixtures and likely DGW gameweeks
+- `community_intel` section in chip strategy output — shows scraped DGW/BGW predictions with sources
+- 43 new tests for DGW prediction and community intel scraping
+
+### Fixed
+- Chip strategy no longer recommends Triple Captain in non-DGW weeks when upcoming DGWs are likely
+- Triple Captain scoring now boosts players on teams with predicted DGWs (1.6x multiplier)
+- Bench Boost scoring factors in predicted DGWs for bench players
+
 ## [0.4.0] - 2026-03-16
 
 ### Added

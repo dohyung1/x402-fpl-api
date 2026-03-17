@@ -7,14 +7,23 @@ Analyzes upcoming fixtures across 10 gameweeks to recommend the optimal
 gameweek for each remaining chip (Bench Boost, Triple Captain, Free Hit,
 Wildcard) based on fixture difficulty, DGW detection, blank detection,
 and squad health.
+
+Includes predicted DGW/BGW detection: fixtures with event=null are
+postponed/unscheduled matches that will be rescheduled into existing
+gameweeks, creating future DGWs. The algorithm factors these in.
 """
 
 import asyncio
+import logging
 
 from app.algorithms.captain import (
     INJURY_STATUSES,
     _build_fixture_map,
     _score_player,
+)
+from app.algorithms.dgw_intel import (
+    fetch_community_dgw_intel,
+    merge_intel_with_api_predictions,
 )
 from app.fpl_client import (
     get_bootstrap,
@@ -24,6 +33,8 @@ from app.fpl_client import (
     get_team_history,
     get_team_picks,
 )
+
+logger = logging.getLogger(__name__)
 
 # How many gameweeks ahead to scan for chip opportunities
 SCAN_WINDOW = 10
@@ -48,6 +59,81 @@ def _count_dgw_teams(fixtures: list, gameweek: int) -> int:
         team_counts[fix["team_h"]] = team_counts.get(fix["team_h"], 0) + 1
         team_counts[fix["team_a"]] = team_counts.get(fix["team_a"], 0) + 1
     return sum(1 for c in team_counts.values() if c >= 2)
+
+
+def _get_unscheduled_fixtures(fixtures: list) -> list[dict]:
+    """
+    Find postponed/unscheduled fixtures (event is null).
+
+    These are matches that have been postponed and will be rescheduled
+    into existing gameweeks, creating future DGWs. The FPL API sets
+    event=null for these fixtures.
+    """
+    return [f for f in fixtures if f.get("event") is None and not f.get("finished")]
+
+
+def _predict_dgw_teams(fixtures: list) -> dict[int, list[dict]]:
+    """
+    Identify teams with pending unscheduled fixtures that will likely
+    create future DGWs when rescheduled.
+
+    Returns: { team_id: [ { opponent_id, opponent_name_placeholder } ] }
+    """
+    unscheduled = _get_unscheduled_fixtures(fixtures)
+    teams_with_pending: dict[int, list[dict]] = {}
+    for fix in unscheduled:
+        home_id = fix["team_h"]
+        away_id = fix["team_a"]
+        teams_with_pending.setdefault(home_id, []).append(
+            {"opponent": away_id, "is_home": True, "fixture_id": fix.get("id")}
+        )
+        teams_with_pending.setdefault(away_id, []).append(
+            {"opponent": home_id, "is_home": False, "fixture_id": fix.get("id")}
+        )
+    return teams_with_pending
+
+
+def _estimate_likely_dgw_gameweeks(fixtures: list, next_gw: int, scan_gws: list[int]) -> dict[int, list[int]]:
+    """
+    Estimate which future gameweeks are likely to become DGWs.
+
+    Heuristic: later gameweeks in the season are more likely targets for
+    rescheduled matches (FPL typically slots postponed fixtures into the
+    second half of the remaining schedule). We score each gameweek based on:
+    - Fewer existing fixtures = more room for rescheduled matches
+    - Later in the window = more likely for rescheduling
+
+    Returns: { gameweek: [team_ids likely to have DGW] }
+    """
+    teams_with_pending = _predict_dgw_teams(fixtures)
+    if not teams_with_pending:
+        return {}
+
+    # Count existing fixtures per GW for teams with pending matches
+    gw_fixture_counts: dict[int, dict[int, int]] = {}
+    for gw in scan_gws:
+        gw_fixture_counts[gw] = {}
+        for fix in fixtures:
+            if fix.get("event") != gw:
+                continue
+            for tid in (fix["team_h"], fix["team_a"]):
+                if tid in teams_with_pending:
+                    gw_fixture_counts[gw][tid] = gw_fixture_counts[gw].get(tid, 0) + 1
+
+    # For each team with pending fixtures, find GWs where they only have 1 match
+    # (room for a rescheduled match to create a DGW)
+    likely_dgw_gws: dict[int, list[int]] = {}
+    for gw in scan_gws:
+        likely_teams = []
+        for tid in teams_with_pending:
+            existing = gw_fixture_counts.get(gw, {}).get(tid, 0)
+            # Team has exactly 1 fixture — room for a second (DGW)
+            if existing == 1:
+                likely_teams.append(tid)
+        if likely_teams:
+            likely_dgw_gws[gw] = likely_teams
+
+    return likely_dgw_gws
 
 
 def _count_blanking_teams(fixtures: list, gameweek: int, all_team_ids: set[int]) -> int:
@@ -136,6 +222,19 @@ async def get_chip_strategy(team_id: int) -> dict:
     # Scan upcoming gameweeks
     scan_gws = list(range(next_gw, min(next_gw + SCAN_WINDOW, 39)))
 
+    # Detect unscheduled fixtures and predict future DGWs
+    teams_with_pending = _predict_dgw_teams(fixtures)
+    likely_dgw_gws = _estimate_likely_dgw_gameweeks(fixtures, next_gw, scan_gws)
+
+    # Fetch community DGW/BGW intelligence (best-effort, non-blocking)
+    community_intel: dict = {}
+    try:
+        community_intel = await fetch_community_dgw_intel()
+        # Merge community predictions with API-based predictions
+        likely_dgw_gws = merge_intel_with_api_predictions(likely_dgw_gws, community_intel, teams_by_id)
+    except Exception:
+        logger.warning("Community DGW intel fetch failed, using API data only")
+
     # Pre-compute per-GW stats
     gw_stats = {}
     for gw in scan_gws:
@@ -144,9 +243,12 @@ async def get_chip_strategy(team_id: int) -> dict:
         avg_fdr = _avg_fdr_for_gw(fixtures, gw)
         fix_count = _gw_fixture_count(fixtures, gw)
         fixture_map = _build_fixture_map(fixtures, gw)
+        predicted_dgw_teams = likely_dgw_gws.get(gw, [])
 
         gw_stats[gw] = {
             "dgw_teams": dgw_teams,
+            "predicted_dgw_teams": predicted_dgw_teams,
+            "total_dgw_teams": dgw_teams + len(predicted_dgw_teams),
             "blank_teams": blank_teams,
             "avg_fdr": avg_fdr,
             "fixture_count": fix_count,
@@ -176,8 +278,14 @@ async def get_chip_strategy(team_id: int) -> dict:
                     fdr_score = (5 - avg_fix_fdr) * 2.0
                     score += fixture_bonus + fdr_score
 
-            # DGW bonus for the whole GW
+                # Predicted DGW bonus: bench players on teams with pending fixtures
+                if player["team"] in stats["predicted_dgw_teams"]:
+                    score += 2.5  # slightly less than confirmed DGW
+
+            # Confirmed DGW bonus
             score += stats["dgw_teams"] * 2.0
+            # Predicted DGW bonus (weighted less than confirmed)
+            score += len(stats["predicted_dgw_teams"]) * 1.5
 
             if score > best_bb_score:
                 best_bb_score = score
@@ -187,7 +295,12 @@ async def get_chip_strategy(team_id: int) -> dict:
             stats = gw_stats[best_bb_gw]
             reasoning_parts = []
             if stats["dgw_teams"] > 0:
-                reasoning_parts.append(f"{stats['dgw_teams']} teams have DGW")
+                reasoning_parts.append(f"{stats['dgw_teams']} teams have confirmed DGW")
+            if stats["predicted_dgw_teams"]:
+                reasoning_parts.append(
+                    f"{len(stats['predicted_dgw_teams'])} teams have potential DGW "
+                    f"(postponed fixtures pending rescheduling)"
+                )
             reasoning_parts.append(f"bench players have favorable fixtures (avg FDR {stats['avg_fdr']})")
             if stats["fixture_count"] > 10:
                 reasoning_parts.append(f"{stats['fixture_count']} fixtures scheduled")
@@ -201,6 +314,7 @@ async def get_chip_strategy(team_id: int) -> dict:
                     "reasoning": ". ".join(reasoning_parts) + ".",
                     "gw_details": {
                         "dgw_teams": stats["dgw_teams"],
+                        "predicted_dgw_teams": len(stats["predicted_dgw_teams"]),
                         "fixture_count": stats["fixture_count"],
                         "avg_fdr": stats["avg_fdr"],
                     },
@@ -223,12 +337,20 @@ async def get_chip_strategy(team_id: int) -> dict:
             for player in bootstrap["elements"]:
                 player_fixes = fmap.get(player["team"])
                 captain_score = _score_player(player, player_fixes)
+
+                # Boost players on teams with predicted DGWs —
+                # TC is most valuable when the captain plays twice
+                if player["team"] in stats["predicted_dgw_teams"]:
+                    captain_score *= 1.6  # predicted DGW for this player's team
+
                 if captain_score > top_score:
                     top_score = captain_score
                     top_player = player
 
-            # DGW massively boosts TC value
+            # Confirmed DGW massively boosts TC value
             dgw_mult = 1.0 + (stats["dgw_teams"] * 0.3)
+            # Predicted DGWs also boost, but less confidently
+            dgw_mult += len(stats["predicted_dgw_teams"]) * 0.2
             adjusted_score = top_score * dgw_mult
 
             if adjusted_score > best_tc_score:
@@ -241,12 +363,18 @@ async def get_chip_strategy(team_id: int) -> dict:
             player_team = teams_by_id.get(best_tc_player["team"], {}).get("short_name", "?")
             reasoning_parts = [f"Best captain option is {best_tc_player['web_name']} ({player_team})"]
             if stats["dgw_teams"] > 0:
-                reasoning_parts.append(f"{stats['dgw_teams']} teams have DGW")
+                reasoning_parts.append(f"{stats['dgw_teams']} teams have confirmed DGW")
+            if stats["predicted_dgw_teams"]:
+                reasoning_parts.append(
+                    f"{len(stats['predicted_dgw_teams'])} teams likely to have DGW (postponed fixtures pending)"
+                )
 
-            # Check if the top player has a DGW
+            # Check if the top player has a confirmed DGW
             player_fixes = stats["fixture_map"].get(best_tc_player["team"], [])
             if len(player_fixes) > 1:
-                reasoning_parts.append(f"{best_tc_player['web_name']} has {len(player_fixes)} fixtures")
+                reasoning_parts.append(f"{best_tc_player['web_name']} has {len(player_fixes)} confirmed fixtures")
+            elif best_tc_player["team"] in stats["predicted_dgw_teams"]:
+                reasoning_parts.append(f"{best_tc_player['web_name']}'s team has a postponed fixture pending")
 
             recommendations.append(
                 {
@@ -263,6 +391,7 @@ async def get_chip_strategy(team_id: int) -> dict:
                     "reasoning": ". ".join(reasoning_parts) + ".",
                     "gw_details": {
                         "dgw_teams": stats["dgw_teams"],
+                        "predicted_dgw_teams": len(stats["predicted_dgw_teams"]),
                         "fixture_count": stats["fixture_count"],
                         "avg_fdr": stats["avg_fdr"],
                     },
@@ -293,6 +422,8 @@ async def get_chip_strategy(team_id: int) -> dict:
 
             # DGW also helps Free Hit (can load up on DGW players)
             score += stats["dgw_teams"] * 3.0
+            # Predicted DGWs also boost Free Hit value
+            score += len(stats["predicted_dgw_teams"]) * 2.0
 
             if score > best_fh_score:
                 best_fh_score = score
@@ -304,7 +435,11 @@ async def get_chip_strategy(team_id: int) -> dict:
             if stats["blank_teams"] > 0:
                 reasoning_parts.append(f"{stats['blank_teams']} teams have no fixture (blank GW)")
             if stats["dgw_teams"] > 0:
-                reasoning_parts.append(f"{stats['dgw_teams']} teams have DGW")
+                reasoning_parts.append(f"{stats['dgw_teams']} teams have confirmed DGW")
+            if stats["predicted_dgw_teams"]:
+                reasoning_parts.append(
+                    f"{len(stats['predicted_dgw_teams'])} teams likely to have DGW (postponed fixtures pending)"
+                )
             reasoning_parts.append("high fixture variance makes squad restructuring valuable")
 
             recommendations.append(
@@ -316,6 +451,7 @@ async def get_chip_strategy(team_id: int) -> dict:
                     "reasoning": ". ".join(reasoning_parts) + ".",
                     "gw_details": {
                         "dgw_teams": stats["dgw_teams"],
+                        "predicted_dgw_teams": len(stats["predicted_dgw_teams"]),
                         "blank_teams": stats["blank_teams"],
                         "fixture_count": stats["fixture_count"],
                         "avg_fdr": stats["avg_fdr"],
@@ -409,6 +545,7 @@ async def get_chip_strategy(team_id: int) -> dict:
                     },
                     "gw_details": {
                         "dgw_teams": stats["dgw_teams"],
+                        "predicted_dgw_teams": len(stats.get("predicted_dgw_teams", [])),
                         "fixture_count": stats["fixture_count"],
                         "avg_fdr": stats["avg_fdr"],
                     },
@@ -418,7 +555,26 @@ async def get_chip_strategy(team_id: int) -> dict:
     # Sort recommendations by confidence
     recommendations.sort(key=lambda r: r["confidence_score"], reverse=True)
 
-    return {
+    # Build pending DGW summary for transparency
+    pending_dgws = []
+    if teams_with_pending:
+        for tid, pending_fixes in teams_with_pending.items():
+            team_name = teams_by_id.get(tid, {}).get("short_name", f"Team {tid}")
+            opponents = []
+            for pf in pending_fixes:
+                opp_name = teams_by_id.get(pf["opponent"], {}).get("short_name", f"Team {pf['opponent']}")
+                venue = "home" if pf["is_home"] else "away"
+                opponents.append(f"{opp_name} ({venue})")
+            pending_dgws.append(
+                {
+                    "team": team_name,
+                    "team_id": tid,
+                    "unscheduled_fixtures": opponents,
+                    "likely_dgw_gameweeks": [gw for gw, teams in likely_dgw_gws.items() if tid in teams],
+                }
+            )
+
+    result = {
         "team_id": team_id,
         "gameweek": current_gw,
         "scan_window": f"GW{next_gw}-GW{scan_gws[-1]}" if scan_gws else "N/A",
@@ -428,3 +584,28 @@ async def get_chip_strategy(team_id: int) -> dict:
         ],
         "recommendations": recommendations,
     }
+
+    if pending_dgws:
+        result["pending_dgws"] = {
+            "summary": (
+                f"{len(teams_with_pending)} teams have postponed fixtures that will create future DGWs. "
+                f"Consider waiting for official scheduling before using Triple Captain or Bench Boost."
+            ),
+            "teams": pending_dgws,
+        }
+
+    # Add community intelligence if available
+    if community_intel:
+        intel_summary = {}
+        if community_intel.get("dgws"):
+            intel_summary["predicted_dgws"] = community_intel["dgws"]
+        if community_intel.get("bgws"):
+            intel_summary["predicted_bgws"] = community_intel["bgws"]
+        if community_intel.get("sources_checked"):
+            intel_summary["sources"] = community_intel["sources_checked"]
+        if community_intel.get("errors"):
+            intel_summary["source_errors"] = community_intel["errors"]
+        if intel_summary:
+            result["community_intel"] = intel_summary
+
+    return result
