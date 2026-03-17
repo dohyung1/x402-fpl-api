@@ -1,25 +1,26 @@
 """
-Captain Pick algorithm v2.2 — now with FPL expected points.
+Captain Pick algorithm v2.3 — fixture-driven differentiation.
 
 captain_score =
-    points_per_game * 3.0        # highest single-GW correlation (0.42)
-  + form * 2.5                   # strong correlation (0.26)
-  + ep_next * 1.5                # FPL's own ML prediction
-  + xG_per_90 * 2.0              # reduced — low single-GW correlation
-  + xA_per_90 * 1.5              # reduced — low single-GW correlation
-  + home_bonus (2.0 if home)
-  - fixture_difficulty * 2.0     # FDR-based
+    points_per_game * 3.5        # highest single-GW correlation (0.42)
+  + form * 2.8                   # strong correlation (0.26), dynamic per GW
+  + ep_next * 1.0                # FPL's own ML prediction (low backtest correlation)
+  + xG_per_90 * 1.5              # low single-GW correlation per backtest
+  + xA_per_90 * 1.2              # low single-GW correlation per backtest
+  + home_bonus (3.0 if home)     # increased — must differentiate GWs
+  - fixture_difficulty * 3.0     # increased — THE key differentiator between GWs
   + ict_index * 0.01
-  + bonus_per_game * 1.0         # per start, not per 90
+  + bonus_per_game * 1.1         # per start, not per 90
   + penalty_taker_bonus * 1.5
   + minutes_certainty * 1.0
   - playing_chance_penalty
 
-v2.2 changes from v2.1:
-  - Added ep_next (FPL's expected points prediction) to scoring
-  - Fixed bonus_per_game to use starts instead of 90s played
-  - Added blank GW warning in reasoning
-  - ep_next and FPL prediction shown in stats output
+v2.3 changes from v2.2:
+  - Boosted fixture-dependent weights (fdr 2.0→3.0, home 2.0→3.0) so picks
+    vary by gameweek instead of always recommending the same player
+  - Applied backtest GW1-29 weight suggestions (ppg up, xg90/xa90/ep_next down)
+  - v2.2 bug: always picked B.Fernandes (29/29 GWs) because static factors
+    dominated and fixture swings couldn't overcome the gap
 
 Weights tuned against GW1-29 actuals via scripts/backtest.py.
 """
@@ -30,17 +31,17 @@ from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek
 INJURY_STATUSES = {"i", "d", "s", "u"}  # injured, doubtful, suspended, unavailable
 
 WEIGHTS = {
-    "xg90": 2.0,  # reduced — low single-GW correlation per backtest
-    "xa90": 1.5,  # reduced — low single-GW correlation per backtest
-    "form": 2.5,  # strongest predictor after PPG per backtest
-    "ppg": 3.0,  # highest correlation with actual GW points (0.42)
-    "ep_next": 1.5,  # FPL's own ML prediction — high signal, free data
-    "home": 2.0,  # increased — home advantage is a key differentiator
-    "fdr": 2.0,  # increased — fixture difficulty should drive pick variation
-    "ict": 0.01,  # keep
-    "bonus_pg": 1.0,  # increased — bonus correlates well
-    "penalty": 1.5,  # reduced — less important than fixture context
-    "minutes_cert": 1.0,  # keep
+    "xg90": 1.5,  # reduced from 2.0 — low single-GW correlation (0.04)
+    "xa90": 1.2,  # reduced from 1.5 — low single-GW correlation (0.06)
+    "form": 2.8,  # up from 2.5 — strong correlation (0.26), dynamic per GW
+    "ppg": 3.5,  # up from 3.0 — highest correlation (0.42)
+    "ep_next": 1.0,  # down from 1.5 — 0.0 correlation in backtest
+    "home": 3.0,  # up from 2.0 — must differentiate home vs away GWs
+    "fdr": 3.0,  # up from 2.0 — THE key factor for GW-to-GW variation
+    "ict": 0.01,  # keep — already tiny weight
+    "bonus_pg": 1.1,  # up from 1.0 — correlation 0.25
+    "penalty": 1.5,  # keep — correlation 0.27
+    "minutes_cert": 1.0,  # keep — correlation 0.19
     "playing_chance_max_penalty": -10.0,
 }
 
@@ -128,9 +129,21 @@ def _blend_fdr(raw_fdr: int, opponent_strength: int) -> float:
     return round(raw_fdr * 0.6 + strength_normalized * 0.4, 2)
 
 
+def _normalize(value: float, low: float, high: float) -> float:
+    """Normalize a value to 0-1 scale given expected bounds. Clamps to [0, 1]."""
+    if high <= low:
+        return 0.0
+    return max(0.0, min(1.0, (value - low) / (high - low)))
+
+
 def _score_player(player: dict, fixtures: list[dict] | None) -> float:
     """
-    Score a player for captaincy using v2 algorithm with xG/xA data.
+    Score a player for captaincy using v2.3 algorithm with normalized inputs.
+
+    All factors are normalized to 0-1 scale before weighting, so no single
+    factor can dominate due to raw scale (e.g., PPG 6.5 vs xG90 0.3).
+    This allows fixture-dependent factors to actually differentiate picks
+    across gameweeks.
 
     fixtures: list of fixture dicts for the player's team this gameweek.
               Supports DGWs (multiple fixtures) by summing fixture-dependent
@@ -155,14 +168,14 @@ def _score_player(player: dict, fixtures: list[dict] | None) -> float:
     # bonus_per_game: total bonus / starts (more accurate than 90s played)
     bonus_pg = player.get("bonus", 0) / max(1, player.get("starts", 1))
 
-    # Penalty taker bonus
+    # Penalty taker bonus (binary: 0 or 1)
     penalties_order = player.get("penalties_order")
-    penalty_bonus = WEIGHTS["penalty"] if penalties_order == 1 else 0.0
+    penalty_norm = 1.0 if penalties_order == 1 else 0.0
 
-    # FPL's own expected points prediction — high signal
+    # FPL's own expected points prediction
     ep_next = float(player.get("ep_next") or 0)
 
-    # Minutes certainty: starts / possible starts
+    # Minutes certainty: starts / possible starts (already 0-1)
     starts = player.get("starts", 0)
     gw_played = max(1, round(nineties)) if nineties > 0 else 1
     possible_starts = max(1, gw_played)
@@ -171,16 +184,27 @@ def _score_player(player: dict, fixtures: list[dict] | None) -> float:
     # Playing chance penalty (uses chance_of_playing_next_round or status)
     chance_penalty = _playing_chance_penalty(player)
 
-    # Base score (fixture-independent)
+    # --- NORMALIZE all factors to 0-1 scale ---
+    # Bounds based on realistic FPL ranges for viable captain candidates
+    ppg_norm = _normalize(ppg, 0, 10)  # PPG: 0-10
+    form_norm = _normalize(form, 0, 10)  # Form: 0-10
+    xg90_norm = _normalize(xg_per_90, 0, 1.0)  # xG/90: 0-1.0
+    xa90_norm = _normalize(xa_per_90, 0, 0.5)  # xA/90: 0-0.5
+    ict_norm = _normalize(ict, 0, 300)  # ICT: 0-300
+    bonus_norm = _normalize(bonus_pg, 0, 3)  # Bonus/game: 0-3
+    ep_norm = _normalize(ep_next, 0, 10)  # EP: 0-10
+    # minutes_cert already 0-1, penalty_norm already 0-1
+
+    # Base score (fixture-independent) — all inputs 0-1, weights set importance
     base_score = (
-        xg_per_90 * WEIGHTS["xg90"]
-        + xa_per_90 * WEIGHTS["xa90"]
-        + form * WEIGHTS["form"]
-        + ppg * WEIGHTS["ppg"]
-        + ep_next * WEIGHTS["ep_next"]
-        + ict * WEIGHTS["ict"]
-        + bonus_pg * WEIGHTS["bonus_pg"]
-        + penalty_bonus
+        xg90_norm * WEIGHTS["xg90"]
+        + xa90_norm * WEIGHTS["xa90"]
+        + form_norm * WEIGHTS["form"]
+        + ppg_norm * WEIGHTS["ppg"]
+        + ep_norm * WEIGHTS["ep_next"]
+        + ict_norm * WEIGHTS["ict"]
+        + bonus_norm * WEIGHTS["bonus_pg"]
+        + penalty_norm * WEIGHTS["penalty"]
         + minutes_cert * WEIGHTS["minutes_cert"]
         + chance_penalty
     )
@@ -191,12 +215,14 @@ def _score_player(player: dict, fixtures: list[dict] | None) -> float:
         for fixture in fixtures:
             fdr = fixture["fdr"]
             is_home = fixture["is_home"]
+            # Normalize FDR: lower is better, so invert (5=0.0, 1=1.0)
+            fdr_norm = _normalize(5 - fdr, 0, 4)  # FDR 1→1.0, FDR 5→0.0
             home_bonus = WEIGHTS["home"] if is_home else 0.0
-            fixture_score += home_bonus - fdr * WEIGHTS["fdr"]
+            fixture_score += home_bonus + fdr_norm * WEIGHTS["fdr"]
         score = base_score + fixture_score
     else:
-        # No fixture data -- assume average difficulty
-        score = base_score - 3 * WEIGHTS["fdr"]
+        # No fixture data -- assume average difficulty (FDR 3 = 0.5 normalized)
+        score = base_score + 0.5 * WEIGHTS["fdr"]
 
     return round(score, 3)
 
@@ -360,7 +386,7 @@ async def get_captain_picks(gameweek: int | None = None, top_n: int = 5) -> dict
 
     return {
         "gameweek": gameweek,
-        "algorithm_version": "2.2",
+        "algorithm_version": "2.3",
         "picks": picks,
     }
 

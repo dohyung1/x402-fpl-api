@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0] - 2026-03-17
+
+### Fixed
+- **Chip strategy completely rewritten** — v2 algorithm uses multi-chip sequencing instead of scoring each chip independently
+  - WC→BB combo: Wildcard placed 1 GW before Bench Boost to rebuild squad for mega DGW
+  - BB heavily weighted toward confirmed DGW team count (mega DGW with 12 teams dominates)
+  - FH heavily weighted toward BGW blank team count (BGW with 16 teams blanking → FH essential)
+  - TC targets DGWs where premium captain plays twice
+  - Constraint solver ensures no two chips in same GW
+  - Previous v1 scored chips independently and recommended wrong sequence (WC33 instead of community consensus WC32→BB33→FH34→TC36)
+- **Captain algorithm v2.3** — normalized scoring fixes "always picks same player" bug
+  - All factors normalized to 0-1 scale before weighting (PPG, form, xG/xA, ICT, etc.)
+  - Fixture-dependent factors (FDR, home/away) now actually differentiate picks across GWs
+  - v2.2 picked B.Fernandes 29/29 GWs; v2.3 picks from 6 different players based on matchups
+  - Backtest: Top 5 hit rate 10.3%→17.2%, total captain points 166→192, nearly matches "always Haaland" baseline
+  - Weights updated from backtest GW1-29: fdr 2.0→3.0, home 2.0→3.0, ppg 3.0→3.5, xg90 2.0→1.5
+
 ## [0.9.0] - 2026-03-17
 
 ### Added

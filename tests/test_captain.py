@@ -298,8 +298,9 @@ class TestScorePlayer:
         )
         fixtures = [{"fdr": 3, "is_home": True, "opponent": 20}]
         score = _score_player(player, fixtures)
-        # With all zeros, score is just home_bonus - fdr * weight
-        expected = WEIGHTS["home"] - 3 * WEIGHTS["fdr"]
+        # With all zeros normalized, base score is 0. Fixture: home + fdr_norm(FDR 3)
+        # FDR 3 → normalized (5-3)/4 = 0.5 → 0.5 * fdr_weight + home_weight
+        expected = WEIGHTS["home"] + 0.5 * WEIGHTS["fdr"]
         assert score == pytest.approx(expected)
 
     def test_no_fixtures_blank_gw(self):
@@ -318,8 +319,8 @@ class TestScorePlayer:
         score_no_fixtures = _score_player(player, None)
         score_with_fixtures = _score_player(player, [{"fdr": 3, "is_home": False, "opponent": 20}])
 
-        # No fixtures: base_score - 3 * fdr_weight
-        # Away fdr=3: base_score + 0 - 3 * fdr_weight (same if away fdr=3)
+        # No fixtures: base_score + 0.5 * fdr_weight
+        # Away fdr=3: base_score + 0 + 0.5 * fdr_weight (same when away fdr=3)
         assert score_no_fixtures == pytest.approx(score_with_fixtures)
 
     def test_empty_fixtures_list_treated_as_blank(self):
@@ -340,8 +341,9 @@ class TestScorePlayer:
         score_single = _score_player(player, single)
         score_double = _score_player(player, double)
 
-        # The second fixture adds: 0 (away) - 3 * WEIGHTS["fdr"]
-        extra = 0 - 3 * WEIGHTS["fdr"]
+        # DGW should always score higher than single fixture (second fixture adds value)
+        # Second fixture (FDR 3, away): 0 (no home bonus) + 0.5 * fdr_weight
+        extra = 0 + 0.5 * WEIGHTS["fdr"]
         assert score_double == pytest.approx(score_single + extra)
 
     def test_penalty_taker_bonus(self):
