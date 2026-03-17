@@ -21,7 +21,7 @@ wheels/
 # SQLite payment database
 data/
 
-# Internal strategy docs (not for public repo)
-docs/MARKETING_STRATEGY.md
-docs/MARKETING_DRAFTS.md
-docs/PLAN.md
+# Internal docs (not for public repo)
+docs/
+CLAUDE.md
+.claude/
