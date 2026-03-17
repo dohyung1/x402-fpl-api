@@ -25,12 +25,17 @@ v2.3 changes from v2.2:
 Weights tuned against GW1-29 actuals via scripts/backtest.py.
 """
 
+import logging
+
 from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek
+
+logger = logging.getLogger(__name__)
 
 # Statuses that warrant a full injury penalty
 INJURY_STATUSES = {"i", "d", "s", "u"}  # injured, doubtful, suspended, unavailable
 
-WEIGHTS = {
+# Default weights (v2.3) — used when no optimized weights are available
+DEFAULT_WEIGHTS = {
     "xg90": 1.5,  # reduced from 2.0 — low single-GW correlation (0.04)
     "xa90": 1.2,  # reduced from 1.5 — low single-GW correlation (0.06)
     "form": 2.8,  # up from 2.5 — strong correlation (0.26), dynamic per GW
@@ -44,6 +49,31 @@ WEIGHTS = {
     "minutes_cert": 1.0,  # keep — correlation 0.19
     "playing_chance_max_penalty": -10.0,
 }
+
+
+def _load_weights() -> dict:
+    """
+    Load the best available weights: optimized (data-driven) or default (hand-tuned).
+
+    The rolling weight optimizer (weight_optimizer.py) writes optimized weights
+    to data/optimized_weights.json. If that file exists and is fresh, we use it.
+    Otherwise, fall back to DEFAULT_WEIGHTS.
+    """
+    try:
+        from app.algorithms.weight_optimizer import get_optimized_weights
+
+        optimized = get_optimized_weights()
+        if optimized:
+            logger.info("Using optimized weights from rolling optimizer")
+            return optimized
+    except Exception:
+        pass  # No snapshots yet or optimizer not available
+
+    return dict(DEFAULT_WEIGHTS)
+
+
+# Active weights — loaded once at import time, refreshable via load_weights()
+WEIGHTS = _load_weights()
 
 POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
 
