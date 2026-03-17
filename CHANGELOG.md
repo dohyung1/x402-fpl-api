@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2026-03-16
+
+### Fixed
+- FPL API 403 errors — User-Agent header changed from `x402-fpl-api/1.0` to browser-like string, fixing blocked requests for many users
+
+### Added
+- Troubleshooting section in README (FPL API 403s, Claude Desktop sandbox, install issues)
+- Product backlog (`BACKLOG.md`) with 6-sprint development roadmap
+
 ## [0.5.0] - 2026-03-16
 
 ### Added
