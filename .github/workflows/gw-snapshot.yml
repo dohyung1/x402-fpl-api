@@ -1,0 +1,78 @@
+name: GW Snapshot & Weight Optimizer
+
+# Run before each GW deadline (snapshot) and ~48h after (optimize with results).
+# Deadlines from FPL API as of 2026-03-17. Times are UTC.
+#
+# GW31: deadline 2026-03-20 18:30 UTC → snapshot Mar 20 12:00, optimize Mar 23 06:00
+# GW32: deadline 2026-04-10 17:30 UTC → snapshot Apr 10 12:00, optimize Apr 13 06:00
+# GW33: deadline 2026-04-18 10:00 UTC → snapshot Apr 18 06:00, optimize Apr 21 06:00
+# GW34: deadline 2026-04-24 17:30 UTC → snapshot Apr 24 12:00, optimize Apr 27 06:00
+# GW35: deadline 2026-05-02 12:30 UTC → snapshot May  2 06:00, optimize May  5 06:00
+# GW36: deadline 2026-05-09 12:30 UTC → snapshot May  9 06:00, optimize May 12 06:00
+# GW37: deadline 2026-05-17 12:30 UTC → snapshot May 17 06:00, optimize May 20 06:00
+# GW38: deadline 2026-05-24 13:30 UTC → snapshot May 24 06:00, optimize May 27 06:00
+
+on:
+  schedule:
+    # PRE-DEADLINE snapshots — capture player stats before managers lock teams
+    # ~6h before each deadline to ensure fresh data
+    - cron: "0 12 20 3 *"   # GW31 — Mar 20 12:00 UTC
+    - cron: "0 12 10 4 *"   # GW32 — Apr 10 12:00 UTC
+    - cron: "0 6 18 4 *"    # GW33 — Apr 18 06:00 UTC
+    - cron: "0 12 24 4 *"   # GW34 — Apr 24 12:00 UTC
+    - cron: "0 6 2 5 *"     # GW35 — May  2 06:00 UTC
+    - cron: "0 6 9 5 *"     # GW36 — May  9 06:00 UTC
+    - cron: "0 6 17 5 *"    # GW37 — May 17 06:00 UTC
+    - cron: "0 6 24 5 *"    # GW38 — May 24 06:00 UTC
+
+    # POST-GW optimizer runs — ~48h after deadline (results finalized)
+    - cron: "0 6 23 3 *"    # after GW31 — Mar 23 06:00 UTC
+    - cron: "0 6 13 4 *"    # after GW32 — Apr 13 06:00 UTC
+    - cron: "0 6 21 4 *"    # after GW33 — Apr 21 06:00 UTC
+    - cron: "0 6 27 4 *"    # after GW34 — Apr 27 06:00 UTC
+    - cron: "0 6 5 5 *"     # after GW35 — May  5 06:00 UTC
+    - cron: "0 6 12 5 *"    # after GW36 — May 12 06:00 UTC
+    - cron: "0 6 20 5 *"    # after GW37 — May 20 06:00 UTC
+    - cron: "0 6 27 5 *"    # after GW38 — May 27 06:00 UTC
+
+  workflow_dispatch:  # allow manual trigger
+
+jobs:
+  snapshot-and-optimize:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Restore snapshot cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/snapshots
+            data/backtest_cache
+            data/optimized_weights.json
+          key: gw-snapshots-${{ github.run_number }}
+          restore-keys: |
+            gw-snapshots-
+
+      - name: Take GW snapshot
+        run: uv run python scripts/snapshot_gw.py
+
+      - name: Cache live data for optimizer
+        run: uv run python scripts/backtest.py --gameweeks 1-38 2>/dev/null || true
+
+      - name: Run weight optimizer
+        run: uv run python -m app.algorithms.weight_optimizer
+
+      - name: Save snapshot cache
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: |
+            data/snapshots
+            data/backtest_cache
+            data/optimized_weights.json
+          key: gw-snapshots-${{ github.run_number }}
