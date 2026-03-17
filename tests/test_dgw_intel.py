@@ -101,10 +101,7 @@ class TestExtractDgwBgwFromText:
         assert "MCI" in result["dgws"]["36"]["teams"]
 
     def test_mixed_dgw_bgw(self):
-        text = (
-            "BGW34 will see Arsenal and Chelsea blank. "
-            "Their fixtures move to DGW33 instead."
-        )
+        text = "BGW34 will see Arsenal and Chelsea blank. Their fixtures move to DGW33 instead."
         result = _extract_dgw_bgw_from_text(text)
         assert "34" in result["bgws"]
         assert "33" in result["dgws"]

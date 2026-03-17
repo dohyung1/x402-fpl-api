@@ -149,7 +149,7 @@ class TestEstimateLikelyDgwGameweeks:
     def test_multiple_teams_multiple_gws(self):
         """Multiple teams with postponed fixtures across multiple GWs."""
         fixtures = [
-            _fixture(33, 5, 2),   # Team 5 in GW33
+            _fixture(33, 5, 2),  # Team 5 in GW33
             _fixture(34, 10, 3),  # Team 10 in GW34
             _fixture(None, 5, 7),  # Team 5 postponed
             _fixture(None, 10, 8),  # Team 10 postponed
