@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.1] - 2026-03-17
+
+### Added
+- `ep_next` (FPL's own expected points prediction) integrated into captain scoring algorithm (v2.2)
+- Blank GW warning in captain pick reasoning — "NO FIXTURE this GW — do not captain"
+- FPL expected points shown in captain pick stats output
+- Budget disclaimer in transfer suggestions — warns that FPL selling prices may differ
+- `scripts/stats_snapshot.py` — daily PyPI download + GitHub metrics tracker
+
+### Fixed
+- Captain `bonus_per_game` now uses starts instead of 90s played (more accurate denominator)
+
 ## [0.8.0] - 2026-03-17
 
 ### Added

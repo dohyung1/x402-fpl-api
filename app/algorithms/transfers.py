@@ -113,9 +113,19 @@ async def get_transfer_suggestions(
     squad.sort(key=lambda x: x["value_score"])
     transfer_out_candidates = squad[: min(free_transfers, len(squad))]
 
+    # FPL selling rule: you get back selling_price, NOT current_price.
+    # selling_price ≈ purchase_price + 50% of profit (rounded down).
+    # Since we don't know purchase_price, we conservatively estimate
+    # selling_price = current_price (user likely bought near current price).
+    # The entry_history "value" field (if available) gives the actual
+    # squad value including selling prices — but per-player is not exposed.
+
     suggestions = []
     for sell in transfer_out_candidates:
-        budget = sell["cost"] + bank_m  # how much we can spend
+        # Use current cost as selling estimate — user will see final budget
+        # in the FPL app when confirming. This is the best we can do without
+        # knowing individual purchase prices.
+        budget = sell["cost"] + bank_m
         pos_type = sell["position_type"]
 
         # Find best replacements: same position, affordable, better value
@@ -174,6 +184,7 @@ async def get_transfer_suggestions(
         "gameweek": next_gw,
         "free_transfers": free_transfers,
         "bank_balance_m": bank_m,
+        "budget_note": "Budget estimates use current player prices. FPL's selling price may differ if a player's value has risen since purchase — check the FPL app for your exact budget.",
         "transfer_suggestions": suggestions,
         "squad_overview": [
             {

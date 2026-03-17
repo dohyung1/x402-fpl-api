@@ -1,18 +1,25 @@
 """
-Captain Pick algorithm v2.1 — backtest-tuned weights.
+Captain Pick algorithm v2.2 — now with FPL expected points.
 
 captain_score =
     points_per_game * 3.0        # highest single-GW correlation (0.42)
   + form * 2.5                   # strong correlation (0.26)
-  + xG_per_90 * 2.0              # reduced from 5.0 — low single-GW correlation
-  + xA_per_90 * 1.5              # reduced from 3.0 — low single-GW correlation
-  + home_bonus (1.5 if home)
-  - fixture_difficulty * 1.5     # increased — FDR matters
+  + ep_next * 1.5                # FPL's own ML prediction
+  + xG_per_90 * 2.0              # reduced — low single-GW correlation
+  + xA_per_90 * 1.5              # reduced — low single-GW correlation
+  + home_bonus (2.0 if home)
+  - fixture_difficulty * 2.0     # FDR-based
   + ict_index * 0.01
-  + bonus_per_game * 1.0         # increased from 0.5
-  + penalty_taker_bonus * 2.0
+  + bonus_per_game * 1.0         # per start, not per 90
+  + penalty_taker_bonus * 1.5
   + minutes_certainty * 1.0
   - playing_chance_penalty
+
+v2.2 changes from v2.1:
+  - Added ep_next (FPL's expected points prediction) to scoring
+  - Fixed bonus_per_game to use starts instead of 90s played
+  - Added blank GW warning in reasoning
+  - ep_next and FPL prediction shown in stats output
 
 Weights tuned against GW1-29 actuals via scripts/backtest.py.
 """
@@ -27,6 +34,7 @@ WEIGHTS = {
     "xa90": 1.5,  # reduced — low single-GW correlation per backtest
     "form": 2.5,  # strongest predictor after PPG per backtest
     "ppg": 3.0,  # highest correlation with actual GW points (0.42)
+    "ep_next": 1.5,  # FPL's own ML prediction — high signal, free data
     "home": 2.0,  # increased — home advantage is a key differentiator
     "fdr": 2.0,  # increased — fixture difficulty should drive pick variation
     "ict": 0.01,  # keep
@@ -109,17 +117,19 @@ def _score_player(player: dict, fixtures: list[dict] | None) -> float:
         xg_per_90 = xg / nineties
         xa_per_90 = xa / nineties
 
-    # bonus_per_game approximation: total bonus / 90s played
-    gw_played = max(1, round(nineties)) if nineties > 0 else 1
-    bonus_pg = player.get("bonus", 0) / gw_played
+    # bonus_per_game: total bonus / starts (more accurate than 90s played)
+    bonus_pg = player.get("bonus", 0) / max(1, player.get("starts", 1))
 
     # Penalty taker bonus
     penalties_order = player.get("penalties_order")
     penalty_bonus = WEIGHTS["penalty"] if penalties_order == 1 else 0.0
 
-    # Minutes certainty: starts / possible starts (approximate from GWs played)
+    # FPL's own expected points prediction — high signal
+    ep_next = float(player.get("ep_next") or 0)
+
+    # Minutes certainty: starts / possible starts
     starts = player.get("starts", 0)
-    # Count gameweeks where player could have started (events so far)
+    gw_played = max(1, round(nineties)) if nineties > 0 else 1
     possible_starts = max(1, gw_played)
     minutes_cert = starts / possible_starts if possible_starts > 0 else 0.0
 
@@ -132,6 +142,7 @@ def _score_player(player: dict, fixtures: list[dict] | None) -> float:
         + xa_per_90 * WEIGHTS["xa90"]
         + form * WEIGHTS["form"]
         + ppg * WEIGHTS["ppg"]
+        + ep_next * WEIGHTS["ep_next"]
         + ict * WEIGHTS["ict"]
         + bonus_pg * WEIGHTS["bonus_pg"]
         + penalty_bonus
@@ -183,6 +194,13 @@ def _build_reasoning(player: dict, fixtures: list[dict] | None, score: float) ->
     if player.get("penalties_order") == 1:
         parts.append("on penalties")
 
+    # FPL expected points
+    ep_next = float(player.get("ep_next") or 0)
+    if ep_next >= 6:
+        parts.append(f"FPL predicts {ep_next}pts")
+    elif ep_next >= 4:
+        parts.append(f"FPL expects {ep_next}pts")
+
     if fixtures:
         if len(fixtures) > 1:
             parts.append(f"double gameweek ({len(fixtures)} fixtures)")
@@ -194,6 +212,8 @@ def _build_reasoning(player: dict, fixtures: list[dict] | None, score: float) ->
                 parts.append("tough fixture (FDR %d)" % fdr)
             if fixture["is_home"]:
                 parts.append("home advantage")
+    else:
+        parts.append("NO FIXTURE this GW — do not captain")
 
     chance = player.get("chance_of_playing_next_round")
     status = player.get("status", "a")
@@ -287,6 +307,7 @@ async def get_captain_picks(gameweek: int | None = None, top_n: int = 5) -> dict
                 "stats": {
                     "form": float(player.get("form") or 0),
                     "points_per_game": float(player.get("points_per_game") or 0),
+                    "ep_next": float(player.get("ep_next") or 0),
                     "ict_index": float(player.get("ict_index") or 0),
                     "total_points": player.get("total_points", 0),
                     "bonus": player.get("bonus", 0),
@@ -304,7 +325,7 @@ async def get_captain_picks(gameweek: int | None = None, top_n: int = 5) -> dict
 
     return {
         "gameweek": gameweek,
-        "algorithm_version": "2.0",
+        "algorithm_version": "2.2",
         "picks": picks,
     }
 
