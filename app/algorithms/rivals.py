@@ -184,11 +184,16 @@ async def get_rival_analysis(league_id: int, team_id: int) -> dict:
     # Strategic summary
     strategy = _build_strategy(user_standing, rival_analyses, players_by_id, teams_by_id, fixture_map)
 
+    # Determine if current GW is finished — if so, frame analysis for next GW
+    current_event = next((gw for gw in bootstrap["events"] if gw["id"] == current_gw), {})
+    planning_gw = next_gw if current_event.get("finished") else current_gw
+
     return {
         "league_id": league_id,
         "league_name": league_info.get("name", "Unknown"),
         "total_managers": len(standings),
-        "gameweek": current_gw,
+        "gameweek": planning_gw,
+        "standings_as_of_gw": current_gw,
         "your_position": {
             "rank": user_standing["rank"],
             "total_points": user_standing["total"],
