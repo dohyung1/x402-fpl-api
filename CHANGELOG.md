@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2026-03-16
+
+### Added
+- `rival_tracker` MCP tool — mini-league rival intelligence (Sprint 1)
+  - League standings with point gaps and rank changes
+  - Squad comparison: differentials (players you have vs they don't)
+  - Rival captain picks revealed
+  - Rival weakness detection (injuries, blank GWs, poor form, tough fixtures)
+  - Transfer prediction engine: predicts rival's likely next moves
+  - Counter-strategy suggestions to overtake rivals
+- New FPL API endpoints: league standings, manager transfers, manager info
+- Product backlog (`BACKLOG.md`) with 6-sprint development roadmap
+
 ## [0.6.0] - 2026-03-16
 
 ### Fixed

@@ -143,6 +143,33 @@ def get_next_gameweek(bootstrap: dict) -> int:
     return get_current_gameweek(bootstrap)
 
 
+async def get_league_standings(league_id: int) -> dict:
+    """
+    GET /leagues-classic/{league_id}/standings/
+
+    Classic league standings with manager names, ranks, and total points.
+    """
+    return await _fetch(f"/leagues-classic/{league_id}/standings/", ttl=120)
+
+
+async def get_manager_transfers(team_id: int) -> list:
+    """
+    GET /entry/{team_id}/transfers/
+
+    All transfers made this season, ordered by most recent first.
+    """
+    return await _fetch(f"/entry/{team_id}/transfers/", ttl=120)
+
+
+async def get_manager_info(team_id: int) -> dict:
+    """
+    GET /entry/{team_id}/
+
+    Manager profile: name, team name, overall rank, favourite team.
+    """
+    return await _fetch(f"/entry/{team_id}/", ttl=120)
+
+
 async def get_manager_status(team_id: int, bootstrap: dict) -> dict:
     """
     Auto-detect a manager's current status: bank, free transfers,

@@ -57,6 +57,13 @@ def _validate_team_id(team_id: int) -> str | None:
     return None
 
 
+def _validate_league_id(league_id: int) -> str | None:
+    """Return an error message if league_id is invalid, else None."""
+    if not isinstance(league_id, int) or league_id < 1:
+        return "Invalid league_id. Find it in your mini-league URL: fantasy.premierleague.com/leagues/LEAGUE_ID/standings/c"
+    return None
+
+
 def _validate_gameweek(gw: int | None) -> str | None:
     """Return an error message if gameweek is out of range, else None."""
     if gw is not None and (not isinstance(gw, int) or gw < 1 or gw > 38):
@@ -519,6 +526,37 @@ async def chip_strategy(team_id: int) -> dict:
     except Exception:
         logger.exception("chip_strategy failed")
         return _error("Failed to get chip strategy. Check that the team ID is correct and try again.")
+
+
+@mcp.tool()
+async def rival_tracker(league_id: int, team_id: int) -> dict:
+    """
+    Analyze your mini-league rivals and get strategies to beat them.
+
+    USE THIS WHEN the user asks: "How do I beat my rivals?", "What's my mini-league looking like?",
+    "What players do my rivals have?", "Show me my league standings", or any rival/league question.
+
+    Compares your squad against nearby rivals, finds differentials (players you have that they don't),
+    identifies rival weaknesses, predicts their likely next transfers, and suggests counter-strategies.
+
+    The user needs their league ID (from the mini-league URL: fantasy.premierleague.com/leagues/LEAGUE_ID/standings/c)
+    and their team ID.
+
+    Args:
+        league_id: Mini-league ID from the league URL.
+        team_id: Your FPL team ID (the number in your FPL URL).
+    """
+    if err := _validate_league_id(league_id):
+        return _error(err)
+    if err := _validate_team_id(team_id):
+        return _error(err)
+    try:
+        from app.algorithms.rivals import get_rival_analysis
+
+        return await get_rival_analysis(league_id=league_id, team_id=team_id)
+    except Exception:
+        logger.exception("rival_tracker failed")
+        return _error("Failed to analyze rivals. Check that the league ID and team ID are correct and try again.")
 
 
 # ---------------------------------------------------------------------------
