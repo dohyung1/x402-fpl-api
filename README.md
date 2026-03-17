@@ -97,6 +97,83 @@ FPL Intelligence connects directly to the [FPL API](https://www.postman.com/fpla
 
 No API keys. No accounts. No data leaves your machine except FPL API calls.
 
+## Troubleshooting
+
+### "FPL API calls are blocked" / 403 errors
+
+The most common issue. The FPL API blocks requests that don't look like they come from a browser.
+
+**1. Test if the API is reachable from your machine:**
+
+```bash
+curl -s -o /dev/null -w "%{http_code}" \
+  -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" \
+  https://fantasy.premierleague.com/api/bootstrap-static/
+```
+
+If this returns `200`, the API is reachable and the issue is likely Claude Desktop's sandbox (see below). If it returns `403`, your network may be blocking the request.
+
+**2. Claude Desktop network permissions:**
+
+Claude Desktop runs MCP servers in a sandbox. The first time the server calls the FPL API, Claude Desktop may prompt you to approve network access to `fantasy.premierleague.com`. If you dismissed this prompt, the domain stays blocked.
+
+- Restart Claude Desktop and watch for the network approval prompt
+- Check Claude Desktop logs: `~/Library/Logs/Claude/` (macOS)
+
+**3. Corporate network / VPN / firewall:**
+
+Some corporate networks block `*.premierleague.com`. Try:
+- Disconnecting from VPN
+- Switching to a personal network
+- Asking your IT team to allowlist `fantasy.premierleague.com`
+
+**4. FPL API is down or in maintenance:**
+
+The FPL API occasionally goes down during gameweek updates (usually around deadline time) or between seasons (June–July). Check if the API responds in your browser: [fantasy.premierleague.com/api/bootstrap-static/](https://fantasy.premierleague.com/api/bootstrap-static/)
+
+### Server won't start
+
+**`command not found: fpl-intelligence`**
+
+The `fpl-intelligence` binary isn't on your PATH. Try:
+
+```bash
+# Find where pip installed it
+pip show fpl-intelligence
+
+# Use the full path in claude_desktop_config.json
+which fpl-intelligence
+```
+
+Or use `pipx` for isolated installs:
+
+```bash
+pipx install fpl-intelligence
+```
+
+**Python version error:**
+
+FPL Intelligence requires Python 3.12+. Check your version:
+
+```bash
+python3 --version
+```
+
+### "Invalid team_id" errors
+
+Make sure you're using your FPL team ID (a number like `5456980`), not your FPL username. Find it by going to the [FPL website](https://fantasy.premierleague.com), clicking **Points**, and checking the URL:
+
+```
+https://fantasy.premierleague.com/entry/YOUR_TEAM_ID/event/30
+```
+
+### Still stuck?
+
+[Open an issue](https://github.com/dohyung1/x402-fpl-api/issues) with:
+- Your OS and Python version
+- The error message (from Claude Desktop or terminal)
+- Output of the `curl` test above
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
