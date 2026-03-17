@@ -6,19 +6,26 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io)
 
-AI-powered Fantasy Premier League assistant for Claude Desktop. Get personalized captain picks, transfer suggestions, differentials, fixture analysis, price predictions, and live points — all from real FPL data.
+Turn Claude into your FPL analyst. Captain picks, transfer advice, rival scouting, chip timing, league predictions — powered by real-time FPL data.
 
 [![FPL Intelligence MCP server](https://glama.ai/mcp/servers/dohyung1/x402-fpl-api/badges/card.svg)](https://glama.ai/mcp/servers/dohyung1/x402-fpl-api)
 
 ## Quick Start
 
-**1. Install:**
+### Step 1 — Install
 
 ```bash
 pip install fpl-intelligence
 ```
 
-**2. Add to Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+### Step 2 — Connect to Claude Desktop
+
+Open your Claude Desktop config file:
+
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+Add the server:
 
 ```json
 {
@@ -30,11 +37,77 @@ pip install fpl-intelligence
 }
 ```
 
-**3. Restart Claude Desktop and ask:**
+### Step 3 — Restart Claude Desktop
 
-> "Analyze FPL team **YOUR_TEAM_ID** and give me your full recommendation."
+Close and reopen Claude Desktop. You should see `fpl` listed under the MCP servers icon.
 
-That's it. Bank balance, free transfers, and chips are all auto-detected — just provide your team ID.
+### Step 4 — Ask Claude anything about FPL
+
+> "Analyze my FPL team **5456980** — who should I captain, who should I transfer in, and when should I use my chips?"
+
+That's it. Bank balance, free transfers, and chips are all auto-detected from your team ID.
+
+### Where's my team ID?
+
+Go to [fantasy.premierleague.com](https://fantasy.premierleague.com) → click **Points** → grab the number from the URL:
+
+```
+https://fantasy.premierleague.com/entry/YOUR_TEAM_ID/event/30
+```
+
+Your league ID is in the mini-league URL:
+
+```
+https://fantasy.premierleague.com/leagues/YOUR_LEAGUE_ID/standings/c
+```
+
+## 13 Tools
+
+| Tool | What it does |
+|---|---|
+| `fpl_manager_hub` | Full personalized analysis — captain, transfers, differentials, fixtures, price risks |
+| `captain_pick` | Top 5 captain picks scored by form, xG, fixtures, and ICT index |
+| `transfer_suggestions` | Who to bring in and ship out based on your squad and budget |
+| `player_comparison` | Head-to-head compare 2-4 players across every metric |
+| `is_hit_worth_it` | Should you take a -4? Projects net points over N gameweeks |
+| `chip_strategy` | Optimal gameweek for each chip — factors in DGW predictions |
+| `differential_finder` | Hidden gems outperforming their ownership |
+| `fixture_outlook` | Teams ranked by upcoming fixture difficulty |
+| `price_predictions` | Who's rising and falling tonight |
+| `live_points` | Live score, projected bonus, auto-sub scenarios |
+| `rival_tracker` | Spy on mini-league rivals — differentials, weaknesses, predicted moves |
+| `league_analyzer` | Win probabilities for your league — who's the favourite and why |
+| `squad_scout` | Deep scout using FPL's hidden data — ep_next, set pieces, suspension risks |
+
+## Example Prompts
+
+```
+"Give me the full breakdown on team 5456980 — captain, transfers, everything"
+
+"I have 2 free transfers and 1.5m in the bank. Who should I bring in?"
+
+"Salah vs Palmer vs Saka — who's the best pick for the next 5 gameweeks?"
+
+"I want to bring in Haaland for a -4. Is it worth the hit?"
+
+"I still have my bench boost and triple captain. When should I use them?"
+
+"Find me some differentials under 3% ownership that are actually returning points"
+
+"It's 60 minutes into the games — how's my team doing? Any auto-subs?"
+
+"Show me everything about mini-league 1189955 — who's going to win?"
+
+"How do I beat my rivals in league 1189955? I'm team 5456980"
+
+"Which players are about to drop in price tonight? I need to sell before the deadline"
+```
+
+## How It Works
+
+FPL Intelligence connects to the official [FPL API](https://fantasy.premierleague.com/api/bootstrap-static/) — the same free, public data that powers the FPL website. All data is real-time.
+
+The server runs locally on your machine and talks to Claude Desktop via [MCP](https://modelcontextprotocol.io). No API keys, no accounts, no data leaves your machine except FPL API calls.
 
 ### Install from Source
 
@@ -55,59 +128,14 @@ uv sync
 }
 ```
 
-## Find Your FPL Team ID
-
-Go to the [FPL website](https://fantasy.premierleague.com), click "Points", and look at the URL:
-
-```
-https://fantasy.premierleague.com/entry/YOUR_TEAM_ID/event/<gw>
-```
-
-## What Can It Do?
-
-| Tool | What it does |
-|---|---|
-| `fpl_manager_hub` | **Start here.** Full personalized analysis — captain, transfers, differentials, fixtures, price risks |
-| `captain_pick` | Top 5 captain recommendations scored by xG, form, fixtures, and ICT index |
-| `transfer_suggestions` | Transfer in/out recommendations based on your squad and budget |
-| `player_comparison` | Head-to-head compare 2-4 players (e.g. "Salah vs Palmer vs Saka") |
-| `is_hit_worth_it` | Should you take a -4 hit? Projects points over N gameweeks to decide |
-| `chip_strategy` | When to use your remaining chips — optimal GW for each based on fixtures |
-| `differential_finder` | Underowned players outperforming their ownership % |
-| `fixture_outlook` | Teams ranked by upcoming fixture difficulty + best players to target |
-| `price_predictions` | Players likely to rise or fall in price tonight |
-| `live_points` | Live score, projected bonus, and auto-sub scenarios |
-| `rival_tracker` | Mini-league rival analysis — compare squads, find differentials, predict rival moves, get strategies to overtake |
-| `league_analyzer` | **NEW.** Who's going to win your league? Win probabilities based on form, squad quality, chips, momentum |
-| `squad_scout` | Deep scout using FPL's hidden data — expected points, blank GW warnings, set piece duties, suspension risks |
-
-## Example Prompts
-
-Try these in Claude Desktop:
-
-- "Analyze FPL team 5456980 and give me your full recommendation"
-- "Who should I captain this gameweek?"
-- "Compare Salah, Palmer, and Saka"
-- "Is it worth taking a -4 hit to bring in Haaland?"
-- "When should I use my bench boost?"
-- "Find me some differentials under 5% ownership"
-- "Which teams have the easiest fixtures for the next 6 weeks?"
-- "Analyze my mini-league 1189955 for team 5456980 — how do I beat my rivals?"
-- "Who's going to win mini-league 1189955?"
-
-## How It Works
-
-FPL Intelligence connects directly to the [FPL API](https://www.postman.com/fplassist/fpl-assist/collection/zqlmv01/fantasy-premier-league-api) — the same free, public data source used by the FPL website. All data is real-time. The server runs locally on your machine and communicates with Claude Desktop via the [Model Context Protocol (MCP)](https://modelcontextprotocol.io).
-
-No API keys. No accounts. No data leaves your machine except FPL API calls.
-
 ## Troubleshooting
 
-### "FPL API calls are blocked" / 403 errors
+<details>
+<summary><strong>FPL API calls are blocked / 403 errors</strong></summary>
 
-The most common issue. The FPL API blocks requests that don't look like they come from a browser.
+The FPL API blocks requests that don't look like they come from a browser.
 
-**1. Test if the API is reachable from your machine:**
+**Test if the API is reachable:**
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}" \
@@ -115,68 +143,45 @@ curl -s -o /dev/null -w "%{http_code}" \
   https://fantasy.premierleague.com/api/bootstrap-static/
 ```
 
-If this returns `200`, the API is reachable and the issue is likely Claude Desktop's sandbox (see below). If it returns `403`, your network may be blocking the request.
+Returns `200`? The API works — the issue is likely Claude Desktop's sandbox (see below). Returns `403`? Your network is blocking it.
 
-**2. Claude Desktop network permissions:**
+**Claude Desktop sandbox:** Claude Desktop may prompt you to approve network access to `fantasy.premierleague.com`. If you dismissed this, restart Claude Desktop and watch for the prompt. Check logs at `~/Library/Logs/Claude/` (macOS).
 
-Claude Desktop runs MCP servers in a sandbox. The first time the server calls the FPL API, Claude Desktop may prompt you to approve network access to `fantasy.premierleague.com`. If you dismissed this prompt, the domain stays blocked.
+**VPN / corporate network:** Some networks block `*.premierleague.com`. Try disconnecting from VPN or switching to a personal network.
 
-- Restart Claude Desktop and watch for the network approval prompt
-- Check Claude Desktop logs: `~/Library/Logs/Claude/` (macOS)
+**FPL API downtime:** The API goes down around deadline time and between seasons (June-July). Test in your browser: [fantasy.premierleague.com/api/bootstrap-static/](https://fantasy.premierleague.com/api/bootstrap-static/)
 
-**3. Corporate network / VPN / firewall:**
+</details>
 
-Some corporate networks block `*.premierleague.com`. Try:
-- Disconnecting from VPN
-- Switching to a personal network
-- Asking your IT team to allowlist `fantasy.premierleague.com`
+<details>
+<summary><strong>Server won't start / command not found</strong></summary>
 
-**4. FPL API is down or in maintenance:**
-
-The FPL API occasionally goes down during gameweek updates (usually around deadline time) or between seasons (June–July). Check if the API responds in your browser: [fantasy.premierleague.com/api/bootstrap-static/](https://fantasy.premierleague.com/api/bootstrap-static/)
-
-### Server won't start
-
-**`command not found: fpl-intelligence`**
-
-The `fpl-intelligence` binary isn't on your PATH. Try:
+**`command not found: fpl-intelligence`** — The binary isn't on your PATH:
 
 ```bash
-# Find where pip installed it
-pip show fpl-intelligence
-
-# Use the full path in claude_desktop_config.json
-which fpl-intelligence
+which fpl-intelligence   # find the full path
+pip show fpl-intelligence # check install location
 ```
 
-Or use `pipx` for isolated installs:
+Or use `pipx` for isolated installs: `pipx install fpl-intelligence`
 
-```bash
-pipx install fpl-intelligence
-```
+**Python version error:** Requires Python 3.12+. Check with `python3 --version`.
 
-**Python version error:**
+</details>
 
-FPL Intelligence requires Python 3.12+. Check your version:
+<details>
+<summary><strong>Invalid team_id errors</strong></summary>
 
-```bash
-python3 --version
-```
+Use your FPL team ID (a number like `5456980`), not your username. Find it at [fantasy.premierleague.com](https://fantasy.premierleague.com) → **Points** → check the URL.
 
-### "Invalid team_id" errors
+</details>
 
-Make sure you're using your FPL team ID (a number like `5456980`), not your FPL username. Find it by going to the [FPL website](https://fantasy.premierleague.com), clicking **Points**, and checking the URL:
+<details>
+<summary><strong>Still stuck?</strong></summary>
 
-```
-https://fantasy.premierleague.com/entry/YOUR_TEAM_ID/event/30
-```
+[Open an issue](https://github.com/dohyung1/x402-fpl-api/issues) with your OS, Python version, the error message, and the output of the curl test above.
 
-### Still stuck?
-
-[Open an issue](https://github.com/dohyung1/x402-fpl-api/issues) with:
-- Your OS and Python version
-- The error message (from Claude Desktop or terminal)
-- Output of the `curl` test above
+</details>
 
 ## Contributing
 
