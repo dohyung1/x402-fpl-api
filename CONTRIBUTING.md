@@ -16,6 +16,16 @@ uv sync
 uv run pytest tests/ -v
 ```
 
+## Linting & Formatting
+
+```bash
+uv run ruff check .          # lint
+uv run ruff format --check .  # format check
+uv run ruff format .          # auto-format
+```
+
+CI runs both on every push (Python 3.12 + 3.13).
+
 ## Testing with Claude Desktop
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
@@ -31,20 +41,21 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop and try: "Analyze FPL team 5456980"
+Restart Claude Desktop after any code change (it doesn't hot-reload MCP servers).
 
 ## Project Structure
 
 ```
 mcp_server.py          # MCP server — all tool/prompt/resource definitions
 app/
-  fpl_client.py        # FPL API wrapper with caching
+  fpl_client.py        # FPL API wrapper with caching + retry
   algorithms/          # Each tool's logic lives here
-    captain.py         # Captain scoring algorithm
-    transfers.py       # Transfer suggestions
+    captain.py         # Captain scoring algorithm (v2.1)
+    rivals.py          # Mini-league rival intelligence
+    chips.py           # Chip strategy with DGW prediction
     ...
 tests/
-  test_x402.py         # Payment middleware tests
+  test_*.py            # Unit tests (190+ tests)
 ```
 
 ## Adding a New Tool
@@ -58,5 +69,6 @@ tests/
 ## Pull Requests
 
 - Keep PRs focused — one feature or fix per PR
-- Run tests before submitting
+- Run `uv run ruff check . && uv run ruff format --check .` before submitting
+- Run `uv run pytest tests/` before submitting
 - Test with Claude Desktop if your changes affect MCP tools

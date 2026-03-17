@@ -18,5 +18,5 @@ This project connects to the public FPL API and runs locally. The main security 
 
 | Version | Supported |
 |---------|-----------|
-| 0.3.x   | Yes       |
-| < 0.3   | No        |
+| 0.7.x   | Yes       |
+| < 0.7   | No        |

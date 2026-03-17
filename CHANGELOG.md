@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1] - 2026-03-17
+
+### Fixed
+- Rival tracker GW bug — now plans for next gameweek when current GW fixtures are finished
+- Ruff lint/format errors in test files
+
+### Changed
+- Reorganized repo — moved internal docs (BACKLOG, PLAN, MARKETING_*) to `docs/`
+- Updated CLAUDE.md with current project structure, tools, and algorithm
+- Updated CONTRIBUTING.md with lint/format instructions
+- Updated SECURITY.md supported versions to 0.7.x
+
 ## [0.7.0] - 2026-03-16
 
 ### Added
