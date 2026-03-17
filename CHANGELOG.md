@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0] - 2026-03-17
+
+### Added
+- Team strength blending — fixture difficulty now uses FPL's dynamic `strength_attack_home/away` fields (updated weekly) instead of relying solely on static FDR ratings. Affects all tools: captain, transfers, fixtures, differentials, chips, rivals, league analyzer.
+- `xGC/90` (expected goals conceded per 90) for defenders and goalkeepers in player comparison
+- `ep_next` (FPL expected points) shown in player comparison output
+
+### Fixed
+- Auto-sub logic now follows FPL rules: GKP can only sub for GKP, outfield subs follow bench order, prevents GKP subbing for outfield players
+- Fixture outlook now uses blended difficulty scores instead of raw FDR
+
 ## [0.8.1] - 2026-03-17
 
 ### Added

@@ -5,6 +5,7 @@ Ranks teams by aggregate fixture difficulty over the next N gameweeks.
 Home fixtures are weighted lighter (home_weight=0.85) as home advantage eases difficulty.
 """
 
+from app.algorithms.captain import _blend_fdr
 from app.fpl_client import get_bootstrap, get_current_gameweek, get_fixtures
 
 POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
@@ -38,13 +39,19 @@ async def get_fixture_outlook(
         away_id = fix["team_a"]
         gw = fix["event"]
 
+        # Blend raw FDR with team strength for more accurate difficulty
+        away_team = teams.get(away_id, {})
+        home_team = teams.get(home_id, {})
+        home_fdr = _blend_fdr(fix["team_h_difficulty"], away_team.get("strength_attack_away", 1200))
+        away_fdr = _blend_fdr(fix["team_a_difficulty"], home_team.get("strength_attack_home", 1200))
+
         team_fixtures[home_id].append(
             {
                 "gameweek": gw,
                 "opponent": teams.get(away_id, {}).get("short_name", "?"),
                 "venue": "H",
-                "fdr": fix["team_h_difficulty"],
-                "weighted_fdr": fix["team_h_difficulty"] * HOME_WEIGHT,
+                "fdr": home_fdr,
+                "weighted_fdr": home_fdr * HOME_WEIGHT,
             }
         )
         team_fixtures[away_id].append(
@@ -52,8 +59,8 @@ async def get_fixture_outlook(
                 "gameweek": gw,
                 "opponent": teams.get(home_id, {}).get("short_name", "?"),
                 "venue": "A",
-                "fdr": fix["team_a_difficulty"],
-                "weighted_fdr": fix["team_a_difficulty"],
+                "fdr": away_fdr,
+                "weighted_fdr": away_fdr,
             }
         )
 

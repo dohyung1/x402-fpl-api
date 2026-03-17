@@ -86,22 +86,44 @@ async def get_live_points(team_id: int) -> dict:
     total_live = sum(s["contributed_points"] for s in starter_data)
 
     # Auto-sub detection: starters with 0 minutes → suggest bench replacement
+    # FPL auto-sub rules:
+    #   1. GKP can only be replaced by GKP (bench position 12)
+    #   2. Outfield subs happen in bench order (positions 13, 14, 15)
+    #   3. Must maintain valid formation (min 3 DEF, min 2 MID, min 1 FWD)
     auto_sub_scenarios = []
-    bench_players = list(bench_data)
+    used_bench = set()
     for starter in starter_data:
-        if starter["minutes_played"] == 0 and starter["played"] is False:
-            # Find eligible bench player (same position or flexible sub)
-            for bench_p in bench_players:
-                if bench_p["played"]:
-                    auto_sub_scenarios.append(
-                        {
-                            "out": starter["name"],
-                            "in": bench_p["name"],
-                            "points_gained": bench_p["live_points"] - starter["live_points"],
-                            "note": "Auto-sub if starter didn't play",
-                        }
-                    )
-                    break
+        if starter["minutes_played"] == 0:
+            if starter["position"] == "GKP":
+                # GKP can only sub with bench GKP (position 12)
+                for bench_p in bench_data:
+                    if bench_p["position"] == "GKP" and bench_p["played"] and bench_p["element_id"] not in used_bench:
+                        auto_sub_scenarios.append(
+                            {
+                                "out": starter["name"],
+                                "in": bench_p["name"],
+                                "points_gained": bench_p["live_points"],
+                                "note": "GKP auto-sub",
+                            }
+                        )
+                        used_bench.add(bench_p["element_id"])
+                        break
+            else:
+                # Outfield: use first available bench player who played (in bench order)
+                for bench_p in bench_data:
+                    if bench_p["position"] == "GKP":
+                        continue  # GKP can't sub for outfield
+                    if bench_p["played"] and bench_p["element_id"] not in used_bench:
+                        auto_sub_scenarios.append(
+                            {
+                                "out": starter["name"],
+                                "in": bench_p["name"],
+                                "points_gained": bench_p["live_points"],
+                                "note": "Auto-sub (bench order)",
+                            }
+                        )
+                        used_bench.add(bench_p["element_id"])
+                        break
 
     # GW rank estimate: compare to current average points
     gw_event = next((e for e in bootstrap["events"] if e["id"] == current_gw), {})

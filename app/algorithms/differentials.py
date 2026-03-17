@@ -58,7 +58,7 @@ async def get_differentials(
         gameweek = get_next_gameweek(bootstrap)
 
     teams = {t["id"]: t for t in bootstrap["teams"]}
-    fixture_map = _build_fixture_map(fixtures, gameweek)
+    fixture_map = _build_fixture_map(fixtures, gameweek, teams_by_id=teams)
 
     scored = []
     for player in bootstrap["elements"]:

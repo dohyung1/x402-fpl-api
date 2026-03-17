@@ -81,7 +81,7 @@ async def get_transfer_suggestions(
 
     players_by_id = {p["id"]: p for p in bootstrap["elements"]}
     teams = {t["id"]: t for t in bootstrap["teams"]}
-    fixture_map = _build_fixture_map(fixtures, next_gw)
+    fixture_map = _build_fixture_map(fixtures, next_gw, teams_by_id=teams)
 
     # Current squad
     squad = []

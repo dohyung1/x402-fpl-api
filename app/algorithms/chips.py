@@ -242,7 +242,7 @@ async def get_chip_strategy(team_id: int) -> dict:
         blank_teams = _count_blanking_teams(fixtures, gw, all_team_ids)
         avg_fdr = _avg_fdr_for_gw(fixtures, gw)
         fix_count = _gw_fixture_count(fixtures, gw)
-        fixture_map = _build_fixture_map(fixtures, gw)
+        fixture_map = _build_fixture_map(fixtures, gw, teams_by_id=teams_by_id)
         predicted_dgw_teams = likely_dgw_gws.get(gw, [])
 
         gw_stats[gw] = {

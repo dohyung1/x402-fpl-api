@@ -71,7 +71,7 @@ def _build_upcoming_fixtures(
     """Build a list of upcoming fixtures with FDR for the next N gameweeks."""
     upcoming = []
     for gw in range(next_gw, next_gw + gameweeks_ahead):
-        fixture_map = _build_fixture_map(fixtures, gw)
+        fixture_map = _build_fixture_map(fixtures, gw, teams_by_id=teams_by_id)
         gw_fixtures = fixture_map.get(team_id, [])
         for fix in gw_fixtures:
             opp = teams_by_id.get(fix["opponent"], {}).get("short_name", "?")
@@ -174,8 +174,8 @@ async def compare_players(
     elements = bootstrap["elements"]
     teams_by_id = {t["id"]: t for t in bootstrap["teams"]}
 
-    # Build the next-GW fixture map for captain scoring
-    fixture_map = _build_fixture_map(fixtures, next_gw)
+    # Build the next-GW fixture map for captain scoring (with team strength blending)
+    fixture_map = _build_fixture_map(fixtures, next_gw, teams_by_id=teams_by_id)
 
     # Match each name
     matched = []
@@ -214,10 +214,16 @@ async def compare_players(
 
         form = float(player.get("form") or 0)
         ppg = float(player.get("points_per_game") or 0)
+        ep_next = float(player.get("ep_next") or 0)
         total_points = player.get("total_points", 0)
         cost = player["now_cost"] / 10
         ownership = float(player.get("selected_by_percent") or 0)
         ict = float(player.get("ict_index") or 0)
+
+        # Defensive stat for GKP/DEF
+        xgc_per_90 = None
+        if player["element_type"] in (1, 2):  # GKP or DEF
+            xgc_per_90 = float(player.get("expected_goals_conceded_per_90") or 0)
 
         # Net transfers (price pressure)
         transfers_in = player.get("transfers_in_event", 0)
@@ -249,9 +255,11 @@ async def compare_players(
                 "ownership_pct": ownership,
                 "form": form,
                 "points_per_game": ppg,
+                "ep_next": ep_next,
                 "total_points": total_points,
                 "xg_per_90": xg_per_90,
                 "xa_per_90": xa_per_90,
+                "xgc_per_90": xgc_per_90,
                 "ict_index": ict,
                 "captain_score": captain_score,
                 "value_score": value_score,

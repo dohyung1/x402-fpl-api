@@ -72,7 +72,8 @@ async def analyze_league(league_id: int) -> dict:
     all_histories = all_results[len(top_managers) :]
 
     # Build fixture map for upcoming GW
-    fixture_map = _build_fixture_map(fixtures, planning_gw)
+    teams_by_id = {t["id"]: t for t in bootstrap["teams"]}
+    fixture_map = _build_fixture_map(fixtures, planning_gw, teams_by_id=teams_by_id)
 
     # Calculate raw scores for each manager
     manager_analyses = []

@@ -338,7 +338,7 @@ async def _fpl_manager_hub_impl(team_id: int, gameweeks_ahead: int) -> dict:
     teams_by_id = {t["id"]: t for t in bootstrap["teams"]}
     from app.algorithms.captain import INJURY_STATUSES, POSITION_MAP, _build_fixture_map, _score_player
 
-    fixture_map = _build_fixture_map(fixtures, next_gw)
+    fixture_map = _build_fixture_map(fixtures, next_gw, teams_by_id=teams_by_id)
 
     squad = []
     squad_ids = set()

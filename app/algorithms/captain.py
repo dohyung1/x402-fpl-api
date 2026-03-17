@@ -69,10 +69,15 @@ def _playing_chance_penalty(player: dict) -> float:
     return WEIGHTS["playing_chance_max_penalty"] * (1.0 - chance / 100.0)
 
 
-def _build_fixture_map(fixtures: list, gameweek: int) -> dict[int, list[dict]]:
+def _build_fixture_map(fixtures: list, gameweek: int, teams_by_id: dict | None = None) -> dict[int, list[dict]]:
     """
     Map team_id -> list of fixture details for the given gameweek.
     Returns: { team_id: [ { fdr, is_home, opponent_team }, ... ] }
+
+    If teams_by_id is provided, blends raw FDR with team strength fields
+    for a more accurate fixture difficulty score. The strength fields
+    (strength_attack_home/away, strength_defence_home/away) are dynamic
+    values updated weekly by FPL, unlike FDR which is static and coarse.
 
     Supports double gameweeks (DGW) where a team plays multiple fixtures.
     """
@@ -85,12 +90,42 @@ def _build_fixture_map(fixtures: list, gameweek: int) -> dict[int, list[dict]]:
         home_fdr = fix["team_h_difficulty"]
         away_fdr = fix["team_a_difficulty"]
 
+        # Blend FDR with team strength for more accurate difficulty
+        if teams_by_id:
+            away_team = teams_by_id.get(away_id, {})
+            home_team = teams_by_id.get(home_id, {})
+
+            # For home team: difficulty = opponent's away attack strength
+            # Higher opponent attack = harder fixture
+            opp_attack_away = away_team.get("strength_attack_away", 1200)
+            home_fdr = _blend_fdr(home_fdr, opp_attack_away)
+
+            # For away team: difficulty = opponent's home attack strength
+            opp_attack_home = home_team.get("strength_attack_home", 1200)
+            away_fdr = _blend_fdr(away_fdr, opp_attack_home)
+
         # Home team
         fixture_map.setdefault(home_id, []).append({"fdr": home_fdr, "is_home": True, "opponent": away_id})
         # Away team
         fixture_map.setdefault(away_id, []).append({"fdr": away_fdr, "is_home": False, "opponent": home_id})
 
     return fixture_map
+
+
+def _blend_fdr(raw_fdr: int, opponent_strength: int) -> float:
+    """
+    Blend raw FDR (1-5 scale) with opponent team strength (typically 1000-1400).
+
+    FPL's strength values are ~1000-1400 range. We normalize to a 1-5 scale
+    and blend 60% raw FDR + 40% strength-based difficulty.
+
+    This gives better resolution than raw FDR alone — e.g., Man City (FDR 5)
+    at home vs away, or newly promoted teams that FPL rates FDR 2 but are
+    actually dangerous.
+    """
+    # Normalize strength to 1-5 scale: 1000→1.0, 1400→5.0
+    strength_normalized = max(1.0, min(5.0, (opponent_strength - 1000) / 100 + 1.0))
+    return round(raw_fdr * 0.6 + strength_normalized * 0.4, 2)
 
 
 def _score_player(player: dict, fixtures: list[dict] | None) -> float:
@@ -244,7 +279,7 @@ async def get_captain_picks(gameweek: int | None = None, top_n: int = 5) -> dict
         gameweek = get_next_gameweek(bootstrap)
 
     teams = {t["id"]: t for t in bootstrap["teams"]}
-    fixture_map = _build_fixture_map(fixtures, gameweek)
+    fixture_map = _build_fixture_map(fixtures, gameweek, teams_by_id=teams)
 
     scored = []
     for player in bootstrap["elements"]:

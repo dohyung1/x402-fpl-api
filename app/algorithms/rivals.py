@@ -92,7 +92,7 @@ async def get_rival_analysis(league_id: int, team_id: int) -> dict:
     )
 
     # Build fixture map for next GW (for player scoring context)
-    fixture_map = _build_fixture_map(fixtures, next_gw)
+    fixture_map = _build_fixture_map(fixtures, next_gw, teams_by_id=teams_by_id)
 
     # Analyze each rival
     rival_analyses = []
