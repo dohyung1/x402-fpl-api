@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.14.0] - 2026-03-18
+
+### Added
+- **Captain v2.5** — three new scoring signals:
+  - Set-piece taker bonus (corners + direct free kicks)
+  - Dream team consistency (dreamteam_count / starts)
+  - FDR blend reweighted to 60% team strength / 40% raw FDR
+- **Multi-GW transfer scoring** — transfer value now averages fixture difficulty over next 3 gameweeks instead of just the next one
+- Backtest: 184→191 pts (+3.8%), gap to Haaland baseline closed from 11→4 pts
+
 ## [0.13.0] - 2026-03-18
 
 ### Added
