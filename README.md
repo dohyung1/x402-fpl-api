@@ -18,30 +18,43 @@ Turn Claude into your FPL analyst. Captain picks, transfer advice, rival scoutin
 pip install fpl-intelligence
 ```
 
-### Step 2 — Connect to Claude Desktop
+### Step 2 — Find the install path
 
-Open your Claude Desktop config file:
+```bash
+which fpl-intelligence                                 # macOS/Linux
+where fpl-intelligence                                  # Windows
+```
+
+Copy the path it prints (e.g. `/Users/you/.local/bin/fpl-intelligence`). If nothing shows up:
+
+```bash
+find ~ -name "fpl-intelligence" -type f 2>/dev/null     # macOS/Linux
+```
+
+### Step 3 — Add to Claude Desktop
+
+Open your config file and paste in the **full path** from Step 2:
 
 - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-
-Add the server:
 
 ```json
 {
   "mcpServers": {
     "fpl": {
-      "command": "fpl-intelligence"
+      "command": "/Users/you/.local/bin/fpl-intelligence"
     }
   }
 }
 ```
 
-### Step 3 — Restart Claude Desktop
+> **Common mistake:** Using just `"fpl-intelligence"` instead of the full path. Claude Desktop doesn't share your terminal's PATH, so it won't find the command without the full path.
 
-Close and reopen Claude Desktop. You should see `fpl` listed under the MCP servers icon.
+### Step 4 — Restart Claude Desktop
 
-### Step 4 — Ask Claude anything about FPL
+Fully quit (**Cmd+Q** on macOS, not just close the window) and reopen. You should see `fpl` under the MCP servers icon (hammer icon).
+
+### Step 5 — Ask Claude anything about FPL
 
 > "Analyze my FPL team **5456980** — who should I captain, who should I transfer in, and when should I use my chips?"
 
@@ -122,16 +135,20 @@ cd x402-fpl-api
 uv sync
 ```
 
+Then use the **full absolute path** to `uv` and the repo in your Claude Desktop config:
+
 ```json
 {
   "mcpServers": {
     "fpl": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/x402-fpl-api", "mcp_server.py"]
+      "command": "/full/path/to/uv",
+      "args": ["run", "--directory", "/full/path/to/x402-fpl-api", "mcp_server.py"]
     }
   }
 }
 ```
+
+> Find your `uv` path with `which uv` (e.g. `/Users/you/.cargo/bin/uv`).
 
 ## Troubleshooting
 
@@ -159,16 +176,43 @@ Returns `200`? The API works — the issue is likely Claude Desktop's sandbox (s
 </details>
 
 <details>
-<summary><strong>Server won't start / command not found</strong></summary>
+<summary><strong>Server won't start / "Failed to spawn process" / command not found</strong></summary>
 
-**`command not found: fpl-intelligence`** — The binary isn't on your PATH:
+This is the most common issue. Claude Desktop can't find the `fpl-intelligence` binary.
+
+**Step 1 — Find the binary:**
 
 ```bash
-which fpl-intelligence   # find the full path
-pip show fpl-intelligence # check install location
+find ~ -name "fpl-intelligence" -type f 2>/dev/null
 ```
 
-Or use `pipx` for isolated installs: `pipx install fpl-intelligence`
+**Step 2 — Use the full path in your config:**
+
+```json
+{
+  "mcpServers": {
+    "fpl": {
+      "command": "/full/path/to/fpl-intelligence"
+    }
+  }
+}
+```
+
+**Step 3 — Make sure you're editing the right config file:**
+
+```bash
+# macOS — open the file directly
+open ~/Library/Application\ Support/Claude/claude_desktop_config.json
+
+# Windows
+notepad %APPDATA%\Claude\claude_desktop_config.json
+```
+
+**Step 4 — Fully quit and reopen Claude Desktop** (Cmd+Q on macOS, not just close the window).
+
+**Still not working?** Check Claude Desktop's logs for errors:
+- **macOS:** `~/Library/Logs/Claude/`
+- **Windows:** `%APPDATA%\Claude\logs\`
 
 **Python version error:** Requires Python 3.12+. Check with `python3 --version`.
 

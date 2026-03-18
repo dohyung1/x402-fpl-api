@@ -421,7 +421,17 @@ async def _fpl_manager_hub_impl(team_id: int, gameweeks_ahead: int) -> dict:
     total_points = sum(gw.get("points", 0) for gw in season)
     best_gw = max(season, key=lambda g: g.get("points", 0)) if season else {}
     worst_gw = min(season, key=lambda g: g.get("points", 0)) if season else {}
-    chips_used = [{"chip": c["name"], "gameweek": c["event"]} for c in history_data.get("chips", [])]
+    # Show chip history with half-season context (FPL resets all chips after GW19)
+    halfway_gw = 19
+    all_chips_list = history_data.get("chips", [])
+    current_half = "second" if current_gw > halfway_gw else "first"
+    chips_used = []
+    for c in all_chips_list:
+        entry = {"chip": c["name"], "gameweek": c["event"]}
+        if current_gw > halfway_gw and c["event"] <= halfway_gw:
+            entry["note"] = "first half — has reset"
+        chips_used.append(entry)
+    # chips_remaining comes from manager_status (correctly filters by half)
 
     return {
         "team_id": team_id,
@@ -436,6 +446,8 @@ async def _fpl_manager_hub_impl(team_id: int, gameweeks_ahead: int) -> dict:
             "best_gameweek": {"gw": best_gw.get("event"), "points": best_gw.get("points")} if best_gw else None,
             "worst_gameweek": {"gw": worst_gw.get("event"), "points": worst_gw.get("points")} if worst_gw else None,
             "chips_used": chips_used,
+            "chips_remaining": manager_status.get("chips_remaining", []),
+            "half_season": current_half,
         },
         "squad": squad,
         "squad_health": {
