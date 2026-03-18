@@ -39,6 +39,50 @@ def _differential_score(player: dict, fixtures: list[dict] | None, ownership_pct
     return round(score, 3)
 
 
+def _build_why(player: dict, fixtures: list[dict] | None) -> str:
+    """Build a context-rich explanation for why this differential matters NOW."""
+    parts = []
+    ownership = player.get("selected_by_percent", 0)
+    form = float(player.get("form") or 0)
+    ppg = float(player.get("points_per_game") or 0)
+
+    # Ownership context
+    if float(ownership) < 2:
+        parts.append(f"only {ownership}% owned — massive differential")
+    elif float(ownership) < 5:
+        parts.append(f"just {ownership}% owned")
+    else:
+        parts.append(f"{ownership}% owned")
+
+    # Form context
+    if form >= 7:
+        parts.append(f"red-hot form ({form})")
+    elif form >= 5:
+        parts.append(f"strong form ({form})")
+
+    # Fixture context (why THIS gameweek)
+    if fixtures:
+        avg_fdr = sum(f["fdr"] for f in fixtures) / len(fixtures)
+        if len(fixtures) > 1:
+            parts.append(f"double gameweek ({len(fixtures)} fixtures)")
+        elif avg_fdr <= 2:
+            parts.append("easy fixture ahead")
+        if all(f.get("is_home") for f in fixtures):
+            parts.append("playing at home")
+
+    # Value context
+    if ppg >= 5 and float(ownership) < 5:
+        parts.append(f"PPG {ppg} massively underowned for output")
+
+    # Set piece duties
+    if player.get("corners_and_indirect_freekicks_order") == 1:
+        parts.append("on set pieces")
+    if player.get("penalties_order") == 1:
+        parts.append("on penalties")
+
+    return ". ".join(parts).capitalize() if parts else f"{ownership}% owned, form {form}"
+
+
 async def get_differentials(
     max_ownership_pct: float = 10.0,
     gameweek: int | None = None,
@@ -120,10 +164,7 @@ async def get_differentials(
                     "ict_index": float(player.get("ict_index") or 0),
                     "total_points": player.get("total_points", 0),
                 },
-                "why": (
-                    f"Only {player.get('selected_by_percent', 0)}% owned, "
-                    f"form {player.get('form', 0)}, PPG {player.get('points_per_game', 0)}"
-                ),
+                "why": _build_why(player, player_fixtures),
             }
         )
 
