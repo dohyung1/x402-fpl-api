@@ -71,9 +71,18 @@ async def get_fixture_outlook(
         if not team_fix:
             avg_wfdr = 3.0
             fixture_count = 0
+            variance = 0.0
         else:
-            avg_wfdr = round(sum(f["weighted_fdr"] for f in team_fix) / len(team_fix), 2)
-            fixture_count = len(team_fix)
+            wfdrs = [f["weighted_fdr"] for f in team_fix]
+            avg_wfdr = round(sum(wfdrs) / len(wfdrs), 2)
+            fixture_count = len(wfdrs)
+            # Fixture variance — high variance means inconsistent run (risky)
+            mean = sum(wfdrs) / len(wfdrs)
+            variance = round(sum((x - mean) ** 2 for x in wfdrs) / len(wfdrs), 2) if len(wfdrs) > 1 else 0.0
+
+        # Adjusted difficulty: penalize high-variance fixture runs
+        # A team with avg 2.5 and variance 2.0 is riskier than avg 2.5 and variance 0.2
+        adjusted_difficulty = round(avg_wfdr + variance * 0.15, 2)
 
         team_scores.append(
             {
@@ -81,13 +90,15 @@ async def get_fixture_outlook(
                 "team": team_data["short_name"],
                 "team_name": team_data["name"],
                 "avg_difficulty": avg_wfdr,
+                "fixture_variance": variance,
+                "adjusted_difficulty": adjusted_difficulty,
                 "fixture_count": fixture_count,
                 "fixtures": sorted(team_fix, key=lambda x: x["gameweek"]),
             }
         )
 
-    # Sort easiest first
-    team_scores.sort(key=lambda x: x["avg_difficulty"])
+    # Sort easiest first (using adjusted difficulty which penalizes variance)
+    team_scores.sort(key=lambda x: x["adjusted_difficulty"])
     for i, t in enumerate(team_scores):
         t["rank"] = i + 1
 

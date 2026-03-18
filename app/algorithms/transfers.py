@@ -14,7 +14,7 @@ Uses NEXT gameweek by default (what managers are prepping for).
 
 import asyncio
 
-from app.algorithms.captain import _build_fixture_map
+from app.algorithms.captain import _build_fixture_map, _score_player
 from app.algorithms.news import format_news_for_reasoning, has_negative_news, news_penalty_score
 from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek, get_team_picks
 
@@ -176,6 +176,8 @@ async def get_transfer_suggestions(
             score = _player_value_score(p, player_fixtures, future_fixes)
             if score > sell["value_score"]:
                 first_fix = _first_fixture(player_fixtures)
+                # Captain score gives Claude context on captaincy potential
+                cap_score = round(_score_player(p, player_fixtures), 1)
                 replacements.append(
                     {
                         "id": p["id"],
@@ -186,6 +188,7 @@ async def get_transfer_suggestions(
                         "form": float(p.get("form") or 0),
                         "ppg": float(p.get("points_per_game") or 0),
                         "value_score": score,
+                        "captain_score": cap_score,
                         "fixture": first_fix,
                     }
                 )
