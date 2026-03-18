@@ -1,32 +1,33 @@
 """
-Captain Pick algorithm v2.3 — fixture-driven differentiation.
+Captain Pick algorithm v2.4 — normalized scoring with news integration.
 
 captain_score =
-    points_per_game * 3.5        # highest single-GW correlation (0.42)
-  + form * 2.8                   # strong correlation (0.26), dynamic per GW
-  + ep_next * 1.0                # FPL's own ML prediction (low backtest correlation)
-  + xG_per_90 * 1.5              # low single-GW correlation per backtest
-  + xA_per_90 * 1.2              # low single-GW correlation per backtest
+    points_per_game * 4.55       # highest single-GW correlation (0.42)
+  + form * 3.1                   # strong correlation (0.26), dynamic per GW
+  + ep_next * 0.7                # FPL's own ML prediction (low backtest correlation)
+  + xG_per_90 * 1.27             # low single-GW correlation per backtest
+  + xA_per_90 * 1.05             # low single-GW correlation per backtest
   + home_bonus (3.0 if home)     # increased — must differentiate GWs
-  - fixture_difficulty * 3.0     # increased — THE key differentiator between GWs
+  - fixture_difficulty * 3.08    # increased — THE key differentiator between GWs
   + ict_index * 0.01
-  + bonus_per_game * 1.1         # per start, not per 90
-  + penalty_taker_bonus * 1.5
-  + minutes_certainty * 1.0
+  + bonus_per_game * 1.2         # per start, not per 90
+  + penalty_taker_bonus * 1.69
+  + minutes_certainty * 1.02
+  + def_contrib_per_90 * 0.84    # defensive contribution (DEF/MID only)
+  + news_penalty                 # injury/absence news keyword penalty
   - playing_chance_penalty
 
-v2.3 changes from v2.2:
-  - Boosted fixture-dependent weights (fdr 2.0→3.0, home 2.0→3.0) so picks
-    vary by gameweek instead of always recommending the same player
-  - Applied backtest GW1-29 weight suggestions (ppg up, xg90/xa90/ep_next down)
-  - v2.2 bug: always picked B.Fernandes (29/29 GWs) because static factors
-    dominated and fixture swings couldn't overcome the gap
+v2.4 changes from v2.3:
+  - Weights updated from backtest correlation analysis (GW1-29)
+  - Integrated news/injury keyword penalties
+  - News-aware reasoning text
 
 Weights tuned against GW1-29 actuals via scripts/backtest.py.
 """
 
 import logging
 
+from app.algorithms.news import format_news_for_reasoning, news_penalty_score
 from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek
 
 logger = logging.getLogger(__name__)
@@ -34,19 +35,21 @@ logger = logging.getLogger(__name__)
 # Statuses that warrant a full injury penalty
 INJURY_STATUSES = {"i", "d", "s", "u"}  # injured, doubtful, suspended, unavailable
 
-# Default weights (v2.3) — used when no optimized weights are available
+# Default weights (v2.4) — tuned via backtest correlation analysis (GW1-29)
 DEFAULT_WEIGHTS = {
-    "xg90": 1.5,  # reduced from 2.0 — low single-GW correlation (0.04)
-    "xa90": 1.2,  # reduced from 1.5 — low single-GW correlation (0.06)
-    "form": 2.8,  # up from 2.5 — strong correlation (0.26), dynamic per GW
-    "ppg": 3.5,  # up from 3.0 — highest correlation (0.42)
-    "ep_next": 1.0,  # down from 1.5 — 0.0 correlation in backtest
-    "home": 3.0,  # up from 2.0 — must differentiate home vs away GWs
-    "fdr": 3.0,  # up from 2.0 — THE key factor for GW-to-GW variation
-    "ict": 0.01,  # keep — already tiny weight
-    "bonus_pg": 1.1,  # up from 1.0 — correlation 0.25
-    "penalty": 1.5,  # keep — correlation 0.27
-    "minutes_cert": 1.0,  # keep — correlation 0.19
+    "xg90": 1.27,  # low single-GW correlation (0.04)
+    "xa90": 1.05,  # low single-GW correlation (0.06)
+    "form": 3.1,  # strong correlation (0.26), dynamic per GW
+    "ppg": 4.55,  # highest correlation (0.42)
+    "ep_next": 0.7,  # 0.0 correlation in backtest — reduced
+    "home": 3.0,  # must differentiate home vs away GWs
+    "fdr": 3.08,  # THE key factor for GW-to-GW variation
+    "ict": 0.01,  # already tiny weight
+    "bonus_pg": 1.2,  # correlation 0.25
+    "penalty": 1.69,  # correlation 0.27
+    "minutes_cert": 1.02,  # correlation 0.19
+    "def_contrib": 0.84,  # defensive_contribution_per_90 — DEF/MID only
+    "news_penalty": 1.0,  # multiplier for news-based injury penalty
     "playing_chance_max_penalty": -10.0,
 }
 
@@ -216,6 +219,15 @@ def _score_player(player: dict, fixtures: list[dict] | None) -> float:
     # Playing chance penalty (uses chance_of_playing_next_round or status)
     chance_penalty = _playing_chance_penalty(player)
 
+    # News-based injury/absence penalty (supplements chance_of_playing)
+    news_pen = news_penalty_score(player) * WEIGHTS.get("news_penalty", 1.0)
+
+    # Defensive contribution per 90 (DEF and MID only — element_type 2 and 3)
+    def_contrib_per_90 = 0.0
+    element_type = player.get("element_type", 0)
+    if element_type in (2, 3):  # DEF or MID
+        def_contrib_per_90 = float(player.get("defensive_contribution_per_90") or 0)
+
     # --- NORMALIZE all factors to 0-1 scale ---
     # Bounds based on realistic FPL ranges for viable captain candidates
     ppg_norm = _normalize(ppg, 0, 10)  # PPG: 0-10
@@ -225,6 +237,7 @@ def _score_player(player: dict, fixtures: list[dict] | None) -> float:
     ict_norm = _normalize(ict, 0, 300)  # ICT: 0-300
     bonus_norm = _normalize(bonus_pg, 0, 3)  # Bonus/game: 0-3
     ep_norm = _normalize(ep_next, 0, 10)  # EP: 0-10
+    def_contrib_norm = _normalize(def_contrib_per_90, 0, 5.0)  # Def contrib/90: 0-5
     # minutes_cert already 0-1, penalty_norm already 0-1
 
     # Base score (fixture-independent) — all inputs 0-1, weights set importance
@@ -238,7 +251,9 @@ def _score_player(player: dict, fixtures: list[dict] | None) -> float:
         + bonus_norm * WEIGHTS["bonus_pg"]
         + penalty_norm * WEIGHTS["penalty"]
         + minutes_cert * WEIGHTS["minutes_cert"]
+        + def_contrib_norm * WEIGHTS["def_contrib"]
         + chance_penalty
+        + news_pen
     )
 
     # Fixture-dependent scoring -- sum across all fixtures (DGW support)
@@ -319,6 +334,11 @@ def _build_reasoning(player: dict, fixtures: list[dict] | None, score: float) ->
     ict = float(player.get("ict_index") or 0)
     if ict >= 150:
         parts.append("elite ICT index")
+
+    # News/injury information
+    news_text = format_news_for_reasoning(player)
+    if news_text:
+        parts.append(f"news: {news_text}")
 
     if not parts:
         parts.append("solid all-round score")
@@ -409,6 +429,7 @@ async def get_captain_picks(gameweek: int | None = None, top_n: int = 5) -> dict
                     "expected_goal_involvements": float(player.get("expected_goal_involvements") or 0),
                     "xg_per_90": round(xg / nineties, 3) if nineties > 0 else 0,
                     "xa_per_90": round(xa / nineties, 3) if nineties > 0 else 0,
+                    "defensive_contribution_per_90": float(player.get("defensive_contribution_per_90") or 0),
                     "penalties_order": player.get("penalties_order"),
                     "starts": player.get("starts", 0),
                     "chance_of_playing": player.get("chance_of_playing_next_round"),
@@ -418,13 +439,13 @@ async def get_captain_picks(gameweek: int | None = None, top_n: int = 5) -> dict
 
     return {
         "gameweek": gameweek,
-        "algorithm_version": "2.3",
+        "algorithm_version": "2.4",
         "picks": picks,
     }
 
 
 async def _gather_data():
     """Fetch bootstrap and fixtures concurrently."""
-    import asyncio
+    import asyncio as _asyncio
 
-    return await asyncio.gather(get_bootstrap(), get_fixtures())
+    return await _asyncio.gather(get_bootstrap(), get_fixtures())

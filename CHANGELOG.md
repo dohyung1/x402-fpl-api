@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0] - 2026-03-18
+
+### Added
+- **News/injury integration** — player news keywords (hamstring, suspended, unknown return, etc.) now penalise captain picks, transfer suggestions, and surface in comparison and scout reports
+- **Defensive contribution scoring** — DEF/MID players get scored on `defensive_contribution_per_90` across captain, transfer, and comparison tools
+
+### Changed
+- **Captain algorithm v2.4** — weights tuned from GW1-29 backtest correlation analysis
+  - ppg 3.5→4.55, form 2.8→3.1, penalty 1.5→1.69, bonus_pg 1.1→1.2
+  - ep_next 1.0→0.7, xg90 1.5→1.27, xa90 1.2→1.05, def_contrib 1.2→0.84
+  - Backtest: 167→184 pts (+10.2%), gap to Haaland baseline closed from 28→11 pts
+  - Top 3 accuracy doubled (3.4%→6.9%), Top 10 accuracy 17.2%→24.1%
+- Rolling weight optimizer BASE_WEIGHTS synced to v2.4 defaults
+
 ## [0.10.0] - 2026-03-17
 
 ### Fixed

@@ -44,19 +44,20 @@ SEARCH_MULTIPLIERS = [0.5, 1.0, 1.5]
 # Cache optimized weights for this long (seconds)
 WEIGHTS_CACHE_TTL = 3600  # 1 hour
 
-# Base weights (v2.3) — the optimizer adjusts these
+# Base weights (v2.4) — the optimizer adjusts these
 BASE_WEIGHTS = {
-    "xg90": 1.5,
-    "xa90": 1.2,
-    "form": 2.8,
-    "ppg": 3.5,
-    "ep_next": 1.0,
+    "xg90": 1.27,
+    "xa90": 1.05,
+    "form": 3.1,
+    "ppg": 4.55,
+    "ep_next": 0.7,
     "home": 3.0,
-    "fdr": 3.0,
+    "fdr": 3.08,
     "ict": 0.01,
-    "bonus_pg": 1.1,
-    "penalty": 1.5,
-    "minutes_cert": 1.0,
+    "bonus_pg": 1.2,
+    "penalty": 1.69,
+    "minutes_cert": 1.02,
+    "def_contrib": 0.84,
     "playing_chance_max_penalty": -10.0,
 }
 

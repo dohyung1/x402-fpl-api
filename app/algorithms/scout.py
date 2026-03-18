@@ -15,6 +15,7 @@ Surfaces hidden gems and risks that other tools miss.
 
 import asyncio
 
+from app.algorithms.news import get_player_news, has_negative_news
 from app.fpl_client import (
     get_bootstrap,
     get_current_gameweek,
@@ -160,6 +161,13 @@ async def get_squad_scout(team_id: int) -> dict:
 
         # BPS raw score
         player_info["bps"] = p.get("bps", 0)
+
+        # News/injury information
+        news_info = get_player_news(p)
+        if news_info:
+            player_info["news"] = news_info
+            if has_negative_news(p) and is_starter:
+                player_info["news_risk"] = True
 
         best_ep_next.append((ep_next, player_info))
         squad_report.append(player_info)

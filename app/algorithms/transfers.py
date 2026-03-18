@@ -15,6 +15,7 @@ Uses NEXT gameweek by default (what managers are prepping for).
 import asyncio
 
 from app.algorithms.captain import _build_fixture_map
+from app.algorithms.news import format_news_for_reasoning, has_negative_news, news_penalty_score
 from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek, get_team_picks
 
 POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
@@ -38,8 +39,18 @@ def _player_value_score(player: dict, fixtures: list[dict] | None) -> float:
         fixture_score = -3.0
 
     score = form * 2.0 + ppg * 1.0 + fixture_score
+
+    # Defensive contribution bonus for DEF (element_type 2)
+    if player.get("element_type") == 2:
+        def_contrib_per_90 = float(player.get("defensive_contribution_per_90") or 0)
+        score += def_contrib_per_90 * 0.5  # modest boost for defenders who earn defensive points
+
     if player.get("status") in {"i", "d", "s", "u"}:
         score -= 5
+
+    # News-based penalty (catches injuries before chance_of_playing updates)
+    score += news_penalty_score(player)
+
     return round(score, 2)
 
 
@@ -106,6 +117,7 @@ async def get_transfer_suggestions(
                 "value_score": score,
                 "fixture": first_fix,
                 "fixtures": player_fixtures,
+                "_raw": p,
             }
         )
 
@@ -172,7 +184,7 @@ async def get_transfer_suggestions(
                     "cost": sell["cost"],
                     "form": sell["form"],
                     "value_score": sell["value_score"],
-                    "reasoning": _sell_reason(sell),
+                    "reasoning": _sell_reason(sell, sell.get("_raw")),
                 },
                 "transfer_in_options": replacements[:5],
                 "budget_available": round(budget, 1),
@@ -199,7 +211,7 @@ async def get_transfer_suggestions(
     }
 
 
-def _sell_reason(player: dict) -> str:
+def _sell_reason(player: dict, raw_player: dict | None = None) -> str:
     reasons = []
     if player["form"] <= 2.0:
         reasons.append("poor form")
@@ -209,6 +221,11 @@ def _sell_reason(player: dict) -> str:
     fdr = fixture["fdr"] if fixture else 3
     if fdr >= 4:
         reasons.append("tough upcoming fixture (FDR %d)" % fdr)
+    # Add news context if available
+    if raw_player:
+        news_text = format_news_for_reasoning(raw_player)
+        if news_text and has_negative_news(raw_player):
+            reasons.append(f"news: {news_text}")
     if not reasons:
         reasons.append("lowest squad value score")
     return ", ".join(reasons).capitalize()

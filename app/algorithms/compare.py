@@ -15,6 +15,7 @@ from app.algorithms.captain import (
     _build_fixture_map,
     _score_player,
 )
+from app.algorithms.news import get_player_news
 from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek
 
 
@@ -225,6 +226,11 @@ async def compare_players(
         if player["element_type"] in (1, 2):  # GKP or DEF
             xgc_per_90 = float(player.get("expected_goals_conceded_per_90") or 0)
 
+        # Defensive contribution for DEF/MID/FWD (2pts per defensive action)
+        defensive_contribution_per_90 = None
+        if player["element_type"] in (2, 3, 4):  # DEF, MID, FWD
+            defensive_contribution_per_90 = float(player.get("defensive_contribution_per_90") or 0)
+
         # Net transfers (price pressure)
         transfers_in = player.get("transfers_in_event", 0)
         transfers_out = player.get("transfers_out_event", 0)
@@ -260,6 +266,7 @@ async def compare_players(
                 "xg_per_90": xg_per_90,
                 "xa_per_90": xa_per_90,
                 "xgc_per_90": xgc_per_90,
+                "defensive_contribution_per_90": defensive_contribution_per_90,
                 "ict_index": ict,
                 "captain_score": captain_score,
                 "value_score": value_score,
@@ -269,6 +276,7 @@ async def compare_players(
                 ),
                 "status": player.get("status", "a"),
                 "chance_of_playing": player.get("chance_of_playing_next_round"),
+                "news": get_player_news(player),
                 "upcoming_fixtures": upcoming,
                 "avg_fdr_next_{}_gws".format(gameweeks_ahead): avg_fdr,
             }
