@@ -55,16 +55,23 @@ CAPTAIN_PATTERNS = [
     re.compile(r"(\w[\w\s'-]{2,25})\s+(?:is|as)\s+(?:my|the|our)\s+captain", re.IGNORECASE),
     re.compile(r"(?:going with|picking|backing)\s+(\w[\w\s'-]{2,25})\s+(?:as\s+)?captain", re.IGNORECASE),
     re.compile(r"captain\s*(?:pick|choice|option)\s*(?:is|:)\s*(\w[\w\s'-]{2,25})", re.IGNORECASE),
+    # Title patterns: "CAPTAIN BRUNO" or "Captain Haaland, Bruno or Saka"
+    re.compile(r"captain\s+(\w[\w'-]+)", re.IGNORECASE),
+    # "(C)" marker in titles: "BRUNO (C)"
+    re.compile(r"(\w[\w'-]+)\s*\(C\)", re.IGNORECASE),
 ]
 
 TRANSFER_IN_PATTERNS = [
     re.compile(r"(?:bring|get|transfer)\s+(?:in|him in)\s+(\w[\w\s'-]{2,25})", re.IGNORECASE),
     re.compile(r"(?:buy|sign|pick up|grab)\s+(\w[\w\s'-]{2,25})", re.IGNORECASE),
     re.compile(r"(\w[\w\s'-]{2,25})\s+is\s+a\s+(?:must[- ]?have|must[- ]?buy|must[- ]?own)", re.IGNORECASE),
+    # Title patterns: "BUY WILSON" or "SELL HAALAND"
+    re.compile(r"buy\s+(\w[\w'-]+)", re.IGNORECASE),
 ]
 
 TRANSFER_OUT_PATTERNS = [
     re.compile(r"(?:sell|get rid of|transfer out|drop|ship out|ditch)\s+(\w[\w\s'-]{2,25})", re.IGNORECASE),
+    re.compile(r"sell\s+(\w[\w'-]+)", re.IGNORECASE),
 ]
 
 CHIP_PATTERNS = [
@@ -309,11 +316,11 @@ async def _process_channel(channel: dict, player_names: set[str]) -> dict:
     insights = []
     video_titles = []
     for video, transcript in zip(videos, transcripts):
-        if isinstance(transcript, Exception) or transcript is None:
-            continue
+        has_transcript = not isinstance(transcript, Exception) and transcript is not None
+        text = transcript if has_transcript else ""
 
         video_titles.append(video["title"])
-        extracted = _extract_insights(transcript, video["title"], player_names, channel["name"])
+        extracted = _extract_insights(text, video["title"], player_names, channel["name"])
         insights.append(extracted)
 
     return {
@@ -380,10 +387,22 @@ def _extract_from_patterns(
     return found
 
 
+def _extract_players_from_title(title: str, player_names: set[str]) -> list[str]:
+    """Extract player names mentioned directly in a video title."""
+    found = []
+    title_lower = title.lower()
+    # Check each FPL player name against the title
+    for pname in player_names:
+        if len(pname) >= 4 and pname in title_lower:
+            if pname.title() not in found:
+                found.append(pname.title())
+    return found
+
+
 def _extract_insights(
     transcript: str, title: str, player_names: set[str], channel_name: str
 ) -> dict:
-    """Extract FPL insights from a video transcript."""
+    """Extract FPL insights from a video transcript (or title-only if no transcript)."""
     # Combine title and transcript for searching
     full_text = f"{title} {transcript}"
 
@@ -420,6 +439,19 @@ def _extract_insights(
                 elif "double" in context or "dgw" in context:
                     dgw_gws.add(gw_num)
 
+    # If no transcript available, extract players directly from title
+    title_players = _extract_players_from_title(title, player_names)
+    has_transcript = len(transcript.strip()) > 0
+    if not has_transcript and title_players:
+        title_lower = title.lower()
+        if "captain" in title_lower and not captains:
+            captains = title_players
+        if any(kw in title_lower for kw in ["transfer", "buy", "bring in", "pick"]) and not transfers_in:
+            transfers_in = title_players
+        if any(kw in title_lower for kw in ["sell", "avoid", "drop"]) and not transfers_out:
+            # Only use players after "avoid"/"sell" keyword if we can distinguish
+            pass  # Don't blindly add — title players could be buys or sells
+
     return {
         "channel": channel_name,
         "title": title,
@@ -430,6 +462,7 @@ def _extract_insights(
         "injuries": injuries,
         "bgw_mentions": sorted(bgw_gws),
         "dgw_mentions": sorted(dgw_gws),
+        "has_transcript": has_transcript,
     }
 
 
