@@ -25,6 +25,7 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "uvicorn[standard]>=0.39.0",
     "web3>=7.14.1",
+    "youtube-transcript-api>=1.0.0",
 ]
 
 [project.urls]

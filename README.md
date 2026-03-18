@@ -61,7 +61,7 @@ Your league ID is in the mini-league URL:
 https://fantasy.premierleague.com/leagues/YOUR_LEAGUE_ID/standings/c
 ```
 
-## 13 Tools
+## 14 Tools
 
 | Tool | What it does |
 |---|---|
@@ -78,6 +78,7 @@ https://fantasy.premierleague.com/leagues/YOUR_LEAGUE_ID/standings/c
 | `rival_tracker` | Spy on mini-league rivals — differentials, weaknesses, predicted moves |
 | `league_analyzer` | Win probabilities for your league — who's the favourite and why |
 | `squad_scout` | Deep scout using FPL's hidden data — ep_next, set pieces, suspension risks |
+| `community_consensus` | What are FPL YouTubers saying? Captain picks, transfers, and chip advice from top creators |
 
 ## Example Prompts
 
@@ -101,6 +102,10 @@ https://fantasy.premierleague.com/leagues/YOUR_LEAGUE_ID/standings/c
 "How do I beat my rivals in league 1189955? I'm team 5456980"
 
 "Which players are about to drop in price tonight? I need to sell before the deadline"
+
+"What are FPL YouTubers saying about this gameweek? Who are they captaining?"
+
+"Get the community consensus on transfers — who are the experts bringing in?"
 ```
 
 ## How It Works
