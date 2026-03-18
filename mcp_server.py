@@ -824,7 +824,7 @@ def _setup_claude_desktop() -> None:
     if not binary:
         # Fallback: the Python executable running this script
         binary = sys.executable
-        print(f"  Could not find 'fpl-intelligence' on PATH.")
+        print("  Could not find 'fpl-intelligence' on PATH.")
         print(f"  Using Python path instead: {binary}\n")
     else:
         print(f"  Found binary: {binary}\n")
