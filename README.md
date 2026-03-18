@@ -20,10 +20,6 @@ Requires [Python 3.12+](https://www.python.org/downloads/).
 pip install fpl-intelligence
 ```
 
-> **"command not found"?** Try `pip3 install fpl-intelligence` or `python3 -m pip install fpl-intelligence`
->
-> **Recommended:** Use [pipx](https://pipx.pypa.io) for a cleaner install: `pipx install fpl-intelligence`
-
 ### Step 2 — Connect to Claude Desktop
 
 ```bash
