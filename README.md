@@ -14,12 +14,15 @@ Turn Claude into your FPL analyst. Captain picks, transfer advice, rival scoutin
 
 ### Step 1 — Install
 
+Requires [Python 3.12+](https://www.python.org/downloads/).
+
 ```bash
-brew install pipx && pipx ensurepath        # one-time setup (macOS)
-pipx install fpl-intelligence
+pip install fpl-intelligence
 ```
 
-> **Windows/Linux:** Install pipx with `pip install pipx && pipx ensurepath`, then restart your terminal.
+> **"command not found"?** Try `pip3 install fpl-intelligence` or `python3 -m pip install fpl-intelligence`
+>
+> **Recommended:** Use [pipx](https://pipx.pypa.io) for a cleaner install: `pipx install fpl-intelligence`
 
 ### Step 2 — Connect to Claude Desktop
 
