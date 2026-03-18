@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.1] - 2026-03-17
+
+### Fixed
+- **Chip strategy bug** — manager hub reported all chips as used in the second half of the season (first-half chips reset after GW19 but weren't labeled)
+- Hub now includes `chips_remaining` and marks first-half chips as "has reset"
+
+### Changed
+- **README setup guide** — full-path install instructions to prevent "Failed to spawn process" errors, expanded troubleshooting
+
 ## [0.11.0] - 2026-03-18
 
 ### Added
