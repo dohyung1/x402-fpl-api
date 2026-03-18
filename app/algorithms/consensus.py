@@ -84,6 +84,12 @@ CHIP_PATTERNS = [
     ),
 ]
 
+BGW_DGW_PATTERNS = [
+    re.compile(r"(?:blank|bgw)\s*(?:game\s*week|gw)\s*(\d{1,2})", re.IGNORECASE),
+    re.compile(r"(?:double|dgw)\s*(?:game\s*week|gw)\s*(\d{1,2})", re.IGNORECASE),
+    re.compile(r"(?:gw|gameweek)\s*(\d{1,2})\s+(?:is\s+)?(?:a\s+)?(?:blank|double)", re.IGNORECASE),
+]
+
 INJURY_PATTERNS = [
     re.compile(r"(\w[\w\s'-]{2,25})\s+(?:is\s+)?(?:injured|out|doubtful|ruled out|sidelined|a doubt)", re.IGNORECASE),
     re.compile(r"(\w[\w\s'-]{2,25})\s+(?:has\s+)?(?:a\s+)?(?:hamstring|ankle|knee|calf|muscle|groin)", re.IGNORECASE),
@@ -234,11 +240,14 @@ async def _fetch_rss_feed(channel_id: str) -> list[dict]:
             continue
 
         # Filter for FPL-related videos by title
+        # These are dedicated FPL channels, so be lenient — most of their content is FPL
         title_lower = title.lower()
         is_fpl = any(kw in title_lower for kw in [
             "fpl", "fantasy", "gameweek", "gw", "captain", "transfer", "wildcard",
             "bench boost", "free hit", "triple captain", "chip", "differential",
-            "premier league",
+            "premier league", "blank", "dgw", "bgw", "draft", "team selection",
+            "buy", "sell", "keep", "avoid", "preview", "review", "tips",
+            "deadline", "points", "rank",
         ])
 
         if video_id and is_fpl:
@@ -398,6 +407,19 @@ def _extract_insights(
                 chip_norm = chip.replace(" ", "_")
                 chip_advice.append({"chip": chip_norm, "gameweek": gw})
 
+    # Extract BGW/DGW mentions
+    bgw_gws = set()
+    dgw_gws = set()
+    for pattern in BGW_DGW_PATTERNS:
+        for match in pattern.finditer(full_text):
+            gw_num = int(match.group(1))
+            if 1 <= gw_num <= 38:
+                context = full_text[max(0, match.start() - 20) : match.end() + 20].lower()
+                if "blank" in context or "bgw" in context:
+                    bgw_gws.add(gw_num)
+                elif "double" in context or "dgw" in context:
+                    dgw_gws.add(gw_num)
+
     return {
         "channel": channel_name,
         "title": title,
@@ -406,6 +428,8 @@ def _extract_insights(
         "transfers_out": transfers_out,
         "chip_advice": chip_advice,
         "injuries": injuries,
+        "bgw_mentions": sorted(bgw_gws),
+        "dgw_mentions": sorted(dgw_gws),
     }
 
 
@@ -510,6 +534,31 @@ def _build_consensus(insights: list[dict], player_names: set[str]) -> dict:
         reverse=True,
     )[:10]
 
+    # Build BGW/DGW consensus
+    bgw_counts: dict[int, list[str]] = {}
+    dgw_counts: dict[int, list[str]] = {}
+    for insight in insights:
+        channel = insight["channel"]
+        for gw in insight.get("bgw_mentions", []):
+            bgw_counts.setdefault(gw, [])
+            if channel not in bgw_counts[gw]:
+                bgw_counts[gw].append(channel)
+        for gw in insight.get("dgw_mentions", []):
+            dgw_counts.setdefault(gw, [])
+            if channel not in dgw_counts[gw]:
+                dgw_counts[gw].append(channel)
+
+    bgw_consensus = sorted(
+        [{"gameweek": gw, "mentioned_by": channels, "count": len(channels)}
+         for gw, channels in bgw_counts.items()],
+        key=lambda x: x["count"], reverse=True,
+    )
+    dgw_consensus = sorted(
+        [{"gameweek": gw, "mentioned_by": channels, "count": len(channels)}
+         for gw, channels in dgw_counts.items()],
+        key=lambda x: x["count"], reverse=True,
+    )
+
     return {
         "captain_consensus": {
             "top_picks": captain_picks[:10],
@@ -519,4 +568,6 @@ def _build_consensus(insights: list[dict], player_names: set[str]) -> dict:
         "transfer_targets_out": transfers_out,
         "chip_advice": chip_advice,
         "injury_flags": injury_flags,
+        "blank_gameweeks": bgw_consensus,
+        "double_gameweeks": dgw_consensus,
     }

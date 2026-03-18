@@ -541,6 +541,24 @@ async def get_chip_strategy(team_id: int) -> dict:
     except Exception:
         logger.warning("Community DGW intel fetch failed, using API data only")
 
+    # Build predicted BGW info from community intel
+    # Community sources know about future BGWs before FPL API reflects them
+    predicted_bgw_teams: dict[int, list[str]] = {}
+    if community_intel:
+        short_to_id: dict[str, int] = {}
+        for tid, team in teams_by_id.items():
+            short_to_id[team.get("short_name", "")] = tid
+
+        for gw_str, info in community_intel.get("bgws", {}).items():
+            gw = int(gw_str)
+            team_ids = []
+            for short_name in info.get("teams", []):
+                tid = short_to_id.get(short_name)
+                if tid:
+                    team_ids.append(tid)
+            if team_ids:
+                predicted_bgw_teams[gw] = team_ids
+
     # Pre-compute per-GW stats
     gw_stats = {}
     for gw in scan_gws:
@@ -551,11 +569,23 @@ async def get_chip_strategy(team_id: int) -> dict:
         fixture_map = _build_fixture_map(fixtures, gw, teams_by_id=teams_by_id)
         predicted_dgw_teams = likely_dgw_gws.get(gw, [])
 
+        # Add community-predicted blank teams (not yet in FPL API)
+        predicted_blank_team_ids = predicted_bgw_teams.get(gw, [])
+        # Don't double-count teams already blanking in FPL API
+        playing: set[int] = set()
+        for fix in fixtures:
+            if fix.get("event") == gw:
+                playing.add(fix["team_h"])
+                playing.add(fix["team_a"])
+        extra_blanks = len([t for t in predicted_blank_team_ids if t in playing])
+        total_blank_teams = blank_teams + extra_blanks
+
         gw_stats[gw] = {
             "dgw_teams": dgw_teams,
             "predicted_dgw_teams": predicted_dgw_teams,
             "total_dgw_teams": dgw_teams + len(predicted_dgw_teams),
-            "blank_teams": blank_teams,
+            "blank_teams": total_blank_teams,
+            "predicted_blank_teams": len(predicted_blank_team_ids),
             "avg_fdr": avg_fdr,
             "fixture_count": fix_count,
             "fixture_map": fixture_map,
