@@ -822,12 +822,17 @@ def _setup_claude_desktop() -> None:
     # Find our own binary path
     binary = shutil.which("fpl-intelligence")
     if not binary:
-        # Fallback: the Python executable running this script
-        binary = sys.executable
-        print("  Could not find 'fpl-intelligence' on PATH.")
-        print(f"  Using Python path instead: {binary}\n")
-    else:
-        print(f"  Found binary: {binary}\n")
+        # Binary is installed next to the Python executable (same bin/ directory)
+        bin_dir = os.path.dirname(sys.executable)
+        candidate = os.path.join(bin_dir, "fpl-intelligence")
+        if os.path.exists(candidate):
+            binary = candidate
+        else:
+            binary = sys.executable
+            print("  Warning: Could not find 'fpl-intelligence' binary.")
+            print(f"  Using Python path instead: {binary}\n")
+
+    print(f"  Found binary: {binary}\n")
 
     # Locate Claude Desktop config
     system = platform.system()
