@@ -18,43 +18,19 @@ Turn Claude into your FPL analyst. Captain picks, transfer advice, rival scoutin
 pip install fpl-intelligence
 ```
 
-### Step 2 — Find the install path
+### Step 2 — Connect to Claude Desktop
 
 ```bash
-which fpl-intelligence                                 # macOS/Linux
-where fpl-intelligence                                  # Windows
+fpl-intelligence --setup
 ```
 
-Copy the path it prints (e.g. `/Users/you/.local/bin/fpl-intelligence`). If nothing shows up:
+This automatically finds the binary and adds it to your Claude Desktop config. Done.
 
-```bash
-find ~ -name "fpl-intelligence" -type f 2>/dev/null     # macOS/Linux
-```
-
-### Step 3 — Add to Claude Desktop
-
-Open your config file and paste in the **full path** from Step 2:
-
-- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "fpl": {
-      "command": "/Users/you/.local/bin/fpl-intelligence"
-    }
-  }
-}
-```
-
-> **Common mistake:** Using just `"fpl-intelligence"` instead of the full path. Claude Desktop doesn't share your terminal's PATH, so it won't find the command without the full path.
-
-### Step 4 — Restart Claude Desktop
+### Step 3 — Restart Claude Desktop
 
 Fully quit (**Cmd+Q** on macOS, not just close the window) and reopen. You should see `fpl` under the MCP servers icon (hammer icon).
 
-### Step 5 — Ask Claude anything about FPL
+### Step 4 — Ask Claude anything about FPL
 
 > "Analyze my FPL team **5456980** — who should I captain, who should I transfer in, and when should I use my chips?"
 
@@ -178,7 +154,13 @@ Returns `200`? The API works — the issue is likely Claude Desktop's sandbox (s
 <details>
 <summary><strong>Server won't start / "Failed to spawn process" / command not found</strong></summary>
 
-This is the most common issue. Claude Desktop can't find the `fpl-intelligence` binary.
+First try re-running the auto-setup:
+
+```bash
+fpl-intelligence --setup
+```
+
+If that doesn't work, set it up manually:
 
 **Step 1 — Find the binary:**
 

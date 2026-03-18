@@ -808,5 +808,82 @@ def what_are_experts_saying() -> str:
     )
 
 
+def _setup_claude_desktop() -> None:
+    """Auto-configure Claude Desktop to use this MCP server."""
+    import json
+    import os
+    import platform
+    import shutil
+    import sys
+    from pathlib import Path
+
+    print("\n  FPL Intelligence — Claude Desktop Setup\n")
+
+    # Find our own binary path
+    binary = shutil.which("fpl-intelligence")
+    if not binary:
+        # Fallback: the Python executable running this script
+        binary = sys.executable
+        print(f"  Could not find 'fpl-intelligence' on PATH.")
+        print(f"  Using Python path instead: {binary}\n")
+    else:
+        print(f"  Found binary: {binary}\n")
+
+    # Locate Claude Desktop config
+    system = platform.system()
+    if system == "Darwin":
+        config_path = Path.home() / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
+    elif system == "Windows":
+        appdata = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
+        config_path = appdata / "Claude" / "claude_desktop_config.json"
+    else:
+        # Linux — Claude Desktop doesn't officially support Linux yet, but try XDG
+        config_path = Path.home() / ".config" / "claude" / "claude_desktop_config.json"
+
+    print(f"  Config file: {config_path}")
+
+    # Read existing config or start fresh
+    if config_path.exists():
+        try:
+            config = json.loads(config_path.read_text())
+            print("  Existing config found — adding FPL server.\n")
+        except json.JSONDecodeError:
+            config = {}
+            print("  Config file exists but is invalid — creating new one.\n")
+    else:
+        config = {}
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        print("  No config file found — creating one.\n")
+
+    # Add/update the fpl server entry
+    if "mcpServers" not in config:
+        config["mcpServers"] = {}
+
+    already_configured = "fpl" in config["mcpServers"]
+    config["mcpServers"]["fpl"] = {"command": binary}
+
+    # Write config
+    config_path.write_text(json.dumps(config, indent=2) + "\n")
+
+    if already_configured:
+        print("  Updated existing 'fpl' server entry.")
+    else:
+        print("  Added 'fpl' server to Claude Desktop config.")
+
+    print(f"\n  Config written to: {config_path}")
+    print("\n  Next step: Restart Claude Desktop (Cmd+Q then reopen).")
+    print("  You should see 'fpl' under the MCP servers icon (hammer icon).\n")
+
+
+def main() -> None:
+    """Entrypoint — handles --setup flag or runs MCP server."""
+    import sys
+
+    if "--setup" in sys.argv:
+        _setup_claude_desktop()
+    else:
+        mcp.run()
+
+
 if __name__ == "__main__":
-    mcp.run()
+    main()

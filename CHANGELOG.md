@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.13.0] - 2026-03-18
+
+### Added
+- **`fpl-intelligence --setup`** — one-command auto-configuration for Claude Desktop (finds binary path, writes config, preserves existing settings)
+
+### Changed
+- **README Quick Start** — simplified from 5 steps to 4 with auto-setup replacing manual config editing
+
 ## [0.12.1] - 2026-03-17
 
 ### Fixed
