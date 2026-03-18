@@ -1,26 +1,28 @@
 """
-Captain Pick algorithm v2.4 — normalized scoring with news integration.
+Captain Pick algorithm v2.5 — set-piece takers, consistency, better FDR.
 
 captain_score =
     points_per_game * 4.55       # highest single-GW correlation (0.42)
   + form * 3.1                   # strong correlation (0.26), dynamic per GW
   + ep_next * 0.7                # FPL's own ML prediction (low backtest correlation)
-  + xG_per_90 * 1.27             # low single-GW correlation per backtest
-  + xA_per_90 * 1.05             # low single-GW correlation per backtest
-  + home_bonus (3.0 if home)     # increased — must differentiate GWs
-  - fixture_difficulty * 3.08    # increased — THE key differentiator between GWs
+  + xG_per_90 * 1.27
+  + xA_per_90 * 1.05
+  + home_bonus (3.0 if home)
+  - fixture_difficulty * 3.08    # THE key differentiator between GWs
   + ict_index * 0.01
-  + bonus_per_game * 1.2         # per start, not per 90
+  + bonus_per_game * 1.2
   + penalty_taker_bonus * 1.69
+  + set_piece_bonus * 1.2        # NEW: corners + direct FK taker
+  + dreamteam_bonus * 0.8        # NEW: consistency signal from FPL dream team
   + minutes_certainty * 1.02
   + def_contrib_per_90 * 0.84    # defensive contribution (DEF/MID only)
   + news_penalty                 # injury/absence news keyword penalty
   - playing_chance_penalty
 
-v2.4 changes from v2.3:
-  - Weights updated from backtest correlation analysis (GW1-29)
-  - Integrated news/injury keyword penalties
-  - News-aware reasoning text
+v2.5 changes from v2.4:
+  - Set-piece taker bonus (corners_and_indirect_freekicks_order, direct_freekicks_order)
+  - Dream team consistency signal (dreamteam_count / starts)
+  - FDR blend reweighted: 40% raw FDR + 60% team strength (was 60/40)
 
 Weights tuned against GW1-29 actuals via scripts/backtest.py.
 """
@@ -35,7 +37,7 @@ logger = logging.getLogger(__name__)
 # Statuses that warrant a full injury penalty
 INJURY_STATUSES = {"i", "d", "s", "u"}  # injured, doubtful, suspended, unavailable
 
-# Default weights (v2.4) — tuned via backtest correlation analysis (GW1-29)
+# Default weights (v2.5) — tuned via backtest correlation analysis (GW1-29)
 DEFAULT_WEIGHTS = {
     "xg90": 1.27,  # low single-GW correlation (0.04)
     "xa90": 1.05,  # low single-GW correlation (0.06)
@@ -47,6 +49,8 @@ DEFAULT_WEIGHTS = {
     "ict": 0.01,  # already tiny weight
     "bonus_pg": 1.2,  # correlation 0.25
     "penalty": 1.69,  # correlation 0.27
+    "set_piece": 1.2,  # corners/FK taker bonus — extra scoring opportunities
+    "dreamteam": 0.8,  # consistency signal — players who regularly haul
     "minutes_cert": 1.02,  # correlation 0.19
     "def_contrib": 0.84,  # defensive_contribution_per_90 — DEF/MID only
     "news_penalty": 1.0,  # multiplier for news-based injury penalty
@@ -152,16 +156,14 @@ def _blend_fdr(raw_fdr: int, opponent_strength: int) -> float:
     """
     Blend raw FDR (1-5 scale) with opponent team strength (typically 1000-1400).
 
-    FPL's strength values are ~1000-1400 range. We normalize to a 1-5 scale
-    and blend 60% raw FDR + 40% strength-based difficulty.
-
-    This gives better resolution than raw FDR alone — e.g., Man City (FDR 5)
-    at home vs away, or newly promoted teams that FPL rates FDR 2 but are
-    actually dangerous.
+    FPL's strength values are ~1000-1400 range with finer granularity than
+    raw FDR (1-5). We normalize strength to a 1-5 scale and blend
+    40% raw FDR + 60% strength-based difficulty, favouring the dynamic
+    strength values which update weekly over static FDR.
     """
     # Normalize strength to 1-5 scale: 1000→1.0, 1400→5.0
     strength_normalized = max(1.0, min(5.0, (opponent_strength - 1000) / 100 + 1.0))
-    return round(raw_fdr * 0.6 + strength_normalized * 0.4, 2)
+    return round(raw_fdr * 0.4 + strength_normalized * 0.6, 2)
 
 
 def _normalize(value: float, low: float, high: float) -> float:
@@ -228,6 +230,23 @@ def _score_player(player: dict, fixtures: list[dict] | None) -> float:
     if element_type in (2, 3):  # DEF or MID
         def_contrib_per_90 = float(player.get("defensive_contribution_per_90") or 0)
 
+    # Set-piece taker bonus — corners, indirect FKs, direct FKs
+    # Players on set pieces get extra scoring opportunities (goals + assists)
+    corners_order = player.get("corners_and_indirect_freekicks_order")
+    fk_order = player.get("direct_freekicks_order")
+    set_piece_norm = 0.0
+    if corners_order == 1 and fk_order == 1:
+        set_piece_norm = 1.0  # primary on both — elite set piece taker
+    elif corners_order == 1 or fk_order == 1:
+        set_piece_norm = 0.6  # primary on one
+    elif corners_order == 2 or fk_order == 2:
+        set_piece_norm = 0.2  # secondary
+
+    # Dream team consistency — how often this player makes FPL's weekly best XI
+    dreamteam_count = player.get("dreamteam_count", 0)
+    dreamteam_rate = dreamteam_count / max(1, starts) if starts > 0 else 0
+    dreamteam_norm = _normalize(dreamteam_rate, 0, 0.3)  # 30% dream team rate = elite
+
     # --- NORMALIZE all factors to 0-1 scale ---
     # Bounds based on realistic FPL ranges for viable captain candidates
     ppg_norm = _normalize(ppg, 0, 10)  # PPG: 0-10
@@ -250,6 +269,8 @@ def _score_player(player: dict, fixtures: list[dict] | None) -> float:
         + ict_norm * WEIGHTS["ict"]
         + bonus_norm * WEIGHTS["bonus_pg"]
         + penalty_norm * WEIGHTS["penalty"]
+        + set_piece_norm * WEIGHTS.get("set_piece", 1.2)
+        + dreamteam_norm * WEIGHTS.get("dreamteam", 0.8)
         + minutes_cert * WEIGHTS["minutes_cert"]
         + def_contrib_norm * WEIGHTS["def_contrib"]
         + chance_penalty
@@ -301,6 +322,16 @@ def _build_reasoning(player: dict, fixtures: list[dict] | None, score: float) ->
 
     if player.get("penalties_order") == 1:
         parts.append("on penalties")
+
+    # Set piece duties
+    corners_order = player.get("corners_and_indirect_freekicks_order")
+    fk_order = player.get("direct_freekicks_order")
+    if corners_order == 1 and fk_order == 1:
+        parts.append("on corners + free kicks")
+    elif corners_order == 1:
+        parts.append("on corners")
+    elif fk_order == 1:
+        parts.append("on direct free kicks")
 
     # FPL expected points
     ep_next = float(player.get("ep_next") or 0)
@@ -439,7 +470,7 @@ async def get_captain_picks(gameweek: int | None = None, top_n: int = 5) -> dict
 
     return {
         "gameweek": gameweek,
-        "algorithm_version": "2.4",
+        "algorithm_version": "2.5",
         "picks": picks,
     }
 

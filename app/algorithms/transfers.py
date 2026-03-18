@@ -21,8 +21,8 @@ from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek, get_t
 POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
 
 
-def _player_value_score(player: dict, fixtures: list[dict] | None) -> float:
-    """Score a player's transfer value: form + PPG - FDR (DGW-aware)."""
+def _player_value_score(player: dict, fixtures: list[dict] | None, future_fixtures: list[list[dict]] | None = None) -> float:
+    """Score a player's transfer value: form + PPG - FDR over next 3 GWs."""
     form = float(player.get("form") or 0)
     ppg = float(player.get("points_per_game") or 0)
 
@@ -37,6 +37,16 @@ def _player_value_score(player: dict, fixtures: list[dict] | None) -> float:
         fixture_score += max(0, len(fixtures) - 1) * 2.0
     else:
         fixture_score = -3.0
+
+    # Factor in GW+1 and GW+2 fixtures (weighted 0.5 and 0.3)
+    # Transfers are medium-term decisions — avoid short-term traps
+    if future_fixtures:
+        for i, gw_fixtures in enumerate(future_fixtures):
+            weight = 0.5 if i == 0 else 0.3
+            for fix in gw_fixtures:
+                fdr = fix["fdr"]
+                is_home = fix.get("is_home", False)
+                fixture_score += (-fdr * 1.0 + (0.5 if is_home else 0)) * weight
 
     score = form * 2.0 + ppg * 1.0 + fixture_score
 
@@ -94,6 +104,12 @@ async def get_transfer_suggestions(
     teams = {t["id"]: t for t in bootstrap["teams"]}
     fixture_map = _build_fixture_map(fixtures, next_gw, teams_by_id=teams)
 
+    # Build fixture maps for GW+1 and GW+2 (multi-GW transfer evaluation)
+    future_fixture_maps = []
+    for future_gw in [next_gw + 1, next_gw + 2]:
+        if future_gw <= 38:
+            future_fixture_maps.append(_build_fixture_map(fixtures, future_gw, teams_by_id=teams))
+
     # Current squad
     squad = []
     for pick in picks_data.get("picks", []):
@@ -101,7 +117,8 @@ async def get_transfer_suggestions(
         if not p:
             continue
         player_fixtures = fixture_map.get(p["team"])
-        score = _player_value_score(p, player_fixtures)
+        future_fixtures = [fm.get(p["team"], []) for fm in future_fixture_maps]
+        score = _player_value_score(p, player_fixtures, future_fixtures)
         first_fix = _first_fixture(player_fixtures)
         squad.append(
             {
@@ -155,7 +172,8 @@ async def get_transfer_suggestions(
             if p["id"] in {s["id"] for s in squad}:
                 continue
             player_fixtures = fixture_map.get(p["team"])
-            score = _player_value_score(p, player_fixtures)
+            future_fixes = [fm.get(p["team"], []) for fm in future_fixture_maps]
+            score = _player_value_score(p, player_fixtures, future_fixes)
             if score > sell["value_score"]:
                 first_fix = _first_fixture(player_fixtures)
                 replacements.append(

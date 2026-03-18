@@ -56,6 +56,8 @@ BASE_WEIGHTS = {
     "ict": 0.01,
     "bonus_pg": 1.2,
     "penalty": 1.69,
+    "set_piece": 1.2,
+    "dreamteam": 0.8,
     "minutes_cert": 1.02,
     "def_contrib": 0.84,
     "playing_chance_max_penalty": -10.0,
