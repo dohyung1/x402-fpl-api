@@ -15,8 +15,11 @@ Turn Claude into your FPL analyst. Captain picks, transfer advice, rival scoutin
 ### Step 1 — Install
 
 ```bash
-pip install fpl-intelligence
+brew install pipx && pipx ensurepath        # one-time setup (macOS)
+pipx install fpl-intelligence
 ```
+
+> **Windows/Linux:** Install pipx with `pip install pipx && pipx ensurepath`, then restart your terminal.
 
 ### Step 2 — Connect to Claude Desktop
 
@@ -24,11 +27,9 @@ pip install fpl-intelligence
 fpl-intelligence --setup
 ```
 
-This automatically finds the binary and adds it to your Claude Desktop config. Done.
-
 ### Step 3 — Restart Claude Desktop
 
-Fully quit (**Cmd+Q** on macOS, not just close the window) and reopen. You should see `fpl` under the MCP servers icon (hammer icon).
+Quit (**Cmd+Q** on macOS) and reopen. Look for `fpl` under the MCP servers icon (hammer icon).
 
 ### Step 4 — Ask Claude anything about FPL
 
