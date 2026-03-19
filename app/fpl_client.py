@@ -143,6 +143,16 @@ def get_next_gameweek(bootstrap: dict) -> int:
     return get_current_gameweek(bootstrap)
 
 
+async def get_event_status() -> dict:
+    """
+    GET /event-status/
+
+    Bonus points processing status — whether points are confirmed or provisional.
+    Returns status per day: [{bonus_added: true, date: "2026-03-18", ...}]
+    """
+    return await _fetch("/event-status/", ttl=60)
+
+
 async def get_league_standings(league_id: int) -> dict:
     """
     GET /leagues-classic/{league_id}/standings/

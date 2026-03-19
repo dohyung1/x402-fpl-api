@@ -13,7 +13,8 @@ For each top manager, calculates a win probability based on:
 
 import asyncio
 
-from app.algorithms.captain import INJURY_STATUSES, _build_fixture_map
+from app.algorithms import INJURY_STATUSES
+from app.algorithms.captain import _build_fixture_map
 from app.fpl_client import (
     get_bootstrap,
     get_current_gameweek,

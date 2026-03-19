@@ -16,9 +16,8 @@ Players with high positive net transfers are "likely risers".
 Players with high negative net transfers are "likely fallers".
 """
 
+from app.algorithms import POSITION_MAP
 from app.fpl_client import get_bootstrap
-
-POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
 
 # Rough FPL threshold: net ~1M transfers triggers a price change (±0.1m)
 # We normalise relative to this to give a probability estimate

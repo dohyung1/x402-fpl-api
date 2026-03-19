@@ -15,6 +15,7 @@ Surfaces hidden gems and risks that other tools miss.
 
 import asyncio
 
+from app.algorithms import POSITION_MAP
 from app.algorithms.news import get_player_news, has_negative_news
 from app.fpl_client import (
     get_bootstrap,
@@ -23,8 +24,6 @@ from app.fpl_client import (
     get_next_gameweek,
     get_team_picks,
 )
-
-POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
 
 
 async def get_squad_scout(team_id: int) -> dict:

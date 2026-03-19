@@ -13,10 +13,9 @@ differential_score =
 DGW support: fixture difficulty is the average across all fixtures in the GW.
 """
 
+from app.algorithms import POSITION_MAP
 from app.algorithms.captain import _build_fixture_map
 from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek
-
-POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
 
 
 def _differential_score(player: dict, fixtures: list[dict] | None, ownership_pct: float) -> float:

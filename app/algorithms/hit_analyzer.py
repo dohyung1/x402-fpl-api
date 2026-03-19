@@ -10,10 +10,8 @@ If the projected gain exceeds 4 points, the hit is worth it.
 
 import asyncio
 
+from app.algorithms import INJURY_STATUSES, POSITION_MAP
 from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek
-
-POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
-INJURY_STATUSES = {"i", "d", "s", "u"}
 
 # Multipliers for expected-points projection per fixture
 HOME_BOOST = 1.15  # 15% boost for home fixtures

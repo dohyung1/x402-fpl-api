@@ -29,13 +29,11 @@ Weights tuned against GW1-29 actuals via scripts/backtest.py.
 
 import logging
 
+from app.algorithms import INJURY_STATUSES, POSITION_MAP
 from app.algorithms.news import format_news_for_reasoning, news_penalty_score
 from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek
 
 logger = logging.getLogger(__name__)
-
-# Statuses that warrant a full injury penalty
-INJURY_STATUSES = {"i", "d", "s", "u"}  # injured, doubtful, suspended, unavailable
 
 # Default weights (v2.5) — tuned via backtest correlation analysis (GW1-29)
 DEFAULT_WEIGHTS = {
@@ -81,8 +79,6 @@ def _load_weights() -> dict:
 
 # Active weights — loaded once at import time, refreshable via load_weights()
 WEIGHTS = _load_weights()
-
-POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
 
 
 def _playing_chance_penalty(player: dict) -> float:
@@ -468,9 +464,30 @@ async def get_captain_picks(gameweek: int | None = None, top_n: int = 5) -> dict
             }
         )
 
+    # Community consensus: who is the most-captained player this GW?
+    most_captained_info = None
+    for event in bootstrap.get("events", []):
+        if event["id"] == gameweek:
+            mc_id = event.get("most_captained")
+            if mc_id:
+                mc_player = {p["id"]: p for p in bootstrap["elements"]}.get(mc_id)
+                if mc_player:
+                    mc_team = teams.get(mc_player["team"], {})
+                    most_captained_info = {
+                        "player_id": mc_id,
+                        "name": mc_player["web_name"],
+                        "team": mc_team.get("short_name", "?"),
+                        "selected_by_pct": float(mc_player.get("selected_by_percent") or 0),
+                        "captaincy_pct": float(event.get("most_captained_pct") or 0)
+                        if event.get("most_captained_pct")
+                        else None,
+                    }
+            break
+
     return {
         "gameweek": gameweek,
         "algorithm_version": "2.5",
+        "most_captained": most_captained_info,
         "picks": picks,
     }
 

@@ -14,14 +14,15 @@ Uses NEXT gameweek by default (what managers are prepping for).
 
 import asyncio
 
+from app.algorithms import POSITION_MAP
 from app.algorithms.captain import _build_fixture_map, _score_player
 from app.algorithms.news import format_news_for_reasoning, has_negative_news, news_penalty_score
 from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek, get_team_picks
 
-POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
 
-
-def _player_value_score(player: dict, fixtures: list[dict] | None, future_fixtures: list[list[dict]] | None = None) -> float:
+def _player_value_score(
+    player: dict, fixtures: list[dict] | None, future_fixtures: list[list[dict]] | None = None
+) -> float:
     """Score a player's transfer value: form + PPG - FDR over next 3 GWs."""
     form = float(player.get("form") or 0)
     ppg = float(player.get("points_per_game") or 0)

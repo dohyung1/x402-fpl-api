@@ -336,7 +336,8 @@ async def _fpl_manager_hub_impl(team_id: int, gameweeks_ahead: int) -> dict:
     # Build squad overview using element IDs (Fix 8: no web_name collisions)
     players_by_id = {p["id"]: p for p in bootstrap["elements"]}
     teams_by_id = {t["id"]: t for t in bootstrap["teams"]}
-    from app.algorithms.captain import INJURY_STATUSES, POSITION_MAP, _build_fixture_map, _score_player
+    from app.algorithms import INJURY_STATUSES, POSITION_MAP
+    from app.algorithms.captain import _build_fixture_map, _score_player
 
     fixture_map = _build_fixture_map(fixtures, next_gw, teams_by_id=teams_by_id)
 
@@ -657,8 +658,7 @@ async def community_consensus(gameweek: int | None = None) -> dict:
     except Exception:
         logger.exception("community_consensus failed")
         return _error(
-            "Failed to get community consensus. YouTube transcripts may be "
-            "temporarily unavailable — try again."
+            "Failed to get community consensus. YouTube transcripts may be temporarily unavailable — try again."
         )
 
 

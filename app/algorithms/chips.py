@@ -22,8 +22,8 @@ Includes DGW/BGW detection from FPL API (event=null fixtures) and community sour
 import asyncio
 import logging
 
+from app.algorithms import INJURY_STATUSES
 from app.algorithms.captain import (
-    INJURY_STATUSES,
     _build_fixture_map,
     _score_player,
 )
@@ -814,5 +814,26 @@ async def get_chip_strategy(team_id: int) -> dict:
             intel_summary["source_errors"] = community_intel["errors"]
         if intel_summary:
             result["community_intel"] = intel_summary
+
+    # Chip usage trends — how many managers played each chip per GW
+    # Helps Claude reason about community timing ("80k managers used BB in GW34")
+    chip_plays_by_gw = {}
+    for event in bootstrap.get("events", []):
+        gw = event["id"]
+        if gw < next_gw or gw not in set(scan_gws):
+            continue
+        plays = event.get("chip_plays", [])
+        if plays:
+            chip_plays_by_gw[gw] = {CHIP_DISPLAY.get(p["chip_name"], p["chip_name"]): p["num_played"] for p in plays}
+    # Also include past GWs for context (which chips were popular when)
+    for event in bootstrap.get("events", []):
+        gw = event["id"]
+        if not event.get("finished"):
+            continue
+        plays = event.get("chip_plays", [])
+        if plays:
+            chip_plays_by_gw[gw] = {CHIP_DISPLAY.get(p["chip_name"], p["chip_name"]): p["num_played"] for p in plays}
+    if chip_plays_by_gw:
+        result["chip_plays_by_gw"] = dict(sorted(chip_plays_by_gw.items()))
 
     return result

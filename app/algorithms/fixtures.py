@@ -5,10 +5,10 @@ Ranks teams by aggregate fixture difficulty over the next N gameweeks.
 Home fixtures are weighted lighter (home_weight=0.85) as home advantage eases difficulty.
 """
 
+from app.algorithms import POSITION_MAP
 from app.algorithms.captain import _blend_fdr
 from app.fpl_client import get_bootstrap, get_current_gameweek, get_fixtures
 
-POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
 POSITION_NAMES = {"GKP", "DEF", "MID", "FWD"}
 HOME_WEIGHT = 0.85  # Home FDR counts 85% — home advantage reduces effective difficulty
 

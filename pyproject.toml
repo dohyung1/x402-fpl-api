@@ -1,6 +1,6 @@
 [project]
 name = "fpl-intelligence"
-version = "0.14.0"
+version = "0.15.0"
 description = "AI-powered Fantasy Premier League MCP server — captain picks, transfer suggestions, player comparison, chip strategy, and more"
 readme = "README.md"
 license = {text = "MIT"}
@@ -63,10 +63,3 @@ line-length = 120
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
 ignore = ["E501"]
-
-[tool.uv]
-dev-dependencies = [
-    "pytest>=8.0",
-    "pytest-asyncio>=0.24",
-    "ruff>=0.9",
-]

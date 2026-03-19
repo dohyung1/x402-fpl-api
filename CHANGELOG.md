@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.15.0] - 2026-03-18
+
+### Added
+- **Most-captained consensus** — captain pick output now shows who the community is most-captaining and at what %
+- **Chip usage trends** — chip strategy output includes `chip_plays_by_gw` showing how many managers played each chip per GW
+- **Bonus confirmation status** — live points now shows whether bonus points are confirmed or provisional (via `/event-status/` API)
+- **GW context in live points** — highest score, top scorer, and points vs average for richer live analysis
+- **`GET /event-status/`** — new FPL API endpoint in client for bonus finalization status
+
+### Changed
+- **Consolidated shared constants** — `POSITION_MAP` and `INJURY_STATUSES` now defined once in `app/algorithms/__init__.py` instead of duplicated across 8+ files
+- **Removed deprecated `[tool.uv]`** — migrated fully to `[dependency-groups]` format in `pyproject.toml`
+- **Backlog updated** — Sprint 2 and Sprint 3 items marked as complete
+
+### Fixed
+- 8 ruff lint errors in `scripts/evaluate_gw.py` (unused import, extraneous f-strings)
+
 ## [0.14.0] - 2026-03-18
 
 ### Added

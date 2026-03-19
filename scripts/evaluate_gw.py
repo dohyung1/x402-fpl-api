@@ -27,7 +27,6 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from app.algorithms.captain import (  # noqa: E402
-    POSITION_MAP,
     _build_fixture_map,
     _score_player,
 )
@@ -112,14 +111,16 @@ async def evaluate_gameweek(gw: int, bootstrap: dict, fixtures: list) -> dict:
     player_points = []
     for p in players:
         pts = _player_gw_points(live_data, p["id"])
-        player_points.append({
-            "id": p["id"],
-            "name": p["web_name"],
-            "team": p.get("team"),
-            "element_type": p.get("element_type"),
-            "points": pts,
-            "selected_by_percent": float(p.get("selected_by_percent") or 0),
-        })
+        player_points.append(
+            {
+                "id": p["id"],
+                "name": p["web_name"],
+                "team": p.get("team"),
+                "element_type": p.get("element_type"),
+                "points": pts,
+                "selected_by_percent": float(p.get("selected_by_percent") or 0),
+            }
+        )
 
     player_points.sort(key=lambda x: x["points"], reverse=True)
 
@@ -233,10 +234,7 @@ async def evaluate_gameweek(gw: int, bootstrap: dict, fixtures: list) -> dict:
             }
             for dp in top_diffs[:5]
         ],
-        "actual_top5": [
-            {"name": pp["name"], "points": pp["points"]}
-            for pp in player_points[:5]
-        ],
+        "actual_top5": [{"name": pp["name"], "points": pp["points"]} for pp in player_points[:5]],
     }
 
 
@@ -261,25 +259,31 @@ def _print_result(result: dict):
     print(f"{'═' * 70}")
 
     # Captain
-    print(f"\n  CAPTAIN PICK")
-    print(f"    Our pick:       {result['captain_name']} → {result['captain_pts']} pts (rank #{result['captain_rank']})")
+    print("\n  CAPTAIN PICK")
+    print(
+        f"    Our pick:       {result['captain_name']} → {result['captain_pts']} pts (rank #{result['captain_rank']})"
+    )
     print(f"    Haaland:        {result['haaland_pts']} pts (rank #{result['haaland_rank']})")
-    print(f"    Most owned:     {result['most_owned_name']} → {result['most_owned_pts']} pts (rank #{result['most_owned_rank']})")
-    print(f"    Top 3 hit: {'✓' if result['top3_hit'] else '✗'}  Top 5: {'✓' if result['top5_hit'] else '✗'}  Top 10: {'✓' if result['top10_hit'] else '✗'}")
+    print(
+        f"    Most owned:     {result['most_owned_name']} → {result['most_owned_pts']} pts (rank #{result['most_owned_rank']})"
+    )
+    print(
+        f"    Top 3 hit: {'✓' if result['top3_hit'] else '✗'}  Top 5: {'✓' if result['top5_hit'] else '✗'}  Top 10: {'✓' if result['top10_hit'] else '✗'}"
+    )
 
     # Our top 5
-    print(f"\n  OUR TOP 5 vs ACTUAL")
+    print("\n  OUR TOP 5 vs ACTUAL")
     for p in result.get("top5_picks", []):
         marker = "★" if p["actual_rank"] <= 10 else " "
         print(f"    {marker} {p['name']:18} → {p['actual_pts']:3} pts (rank #{p['actual_rank']})")
 
     # Actual top 5
-    print(f"\n  ACTUAL TOP 5 SCORERS")
+    print("\n  ACTUAL TOP 5 SCORERS")
     for p in result.get("actual_top5", []):
         print(f"      {p['name']:18} → {p['points']:3} pts")
 
     # Differentials
-    print(f"\n  DIFFERENTIALS")
+    print("\n  DIFFERENTIALS")
     print(f"    Hits in top 50:    {result['diff_hits_top50']}/10")
     print(f"    Avg pts:           {result['diff_avg_pts']}")
     for d in result.get("top_differentials", []):
@@ -308,15 +312,15 @@ def _print_season_summary(results: list[dict]):
     print(f"\n{'═' * 70}")
     print(f"  SEASON SUMMARY — {n} gameweeks evaluated")
     print(f"{'═' * 70}")
-    print(f"\n  CAPTAIN ACCURACY")
+    print("\n  CAPTAIN ACCURACY")
     print(f"    Top 3 hit rate:    {top3_rate:.1f}%")
     print(f"    Top 5 hit rate:    {top5_rate:.1f}%")
     print(f"    Top 10 hit rate:   {top10_rate:.1f}%")
     print(f"    Avg rank:          {avg_rank:.1f}")
-    print(f"\n  TOTAL CAPTAIN POINTS")
-    print(f"    Algorithm:         {total_captain} pts ({total_captain/n:.1f} avg)")
-    print(f"    Haaland:           {total_haaland} pts ({total_haaland/n:.1f} avg)")
-    print(f"    Most owned:        {total_most_owned} pts ({total_most_owned/n:.1f} avg)")
+    print("\n  TOTAL CAPTAIN POINTS")
+    print(f"    Algorithm:         {total_captain} pts ({total_captain / n:.1f} avg)")
+    print(f"    Haaland:           {total_haaland} pts ({total_haaland / n:.1f} avg)")
+    print(f"    Most owned:        {total_most_owned} pts ({total_most_owned / n:.1f} avg)")
 
     diff = total_captain - total_haaland
     sign = "+" if diff >= 0 else ""
@@ -326,7 +330,7 @@ def _print_season_summary(results: list[dict]):
     sign2 = "+" if diff2 >= 0 else ""
     print(f"    vs Most owned:     {sign2}{diff2} pts")
 
-    print(f"\n  DIFFERENTIALS")
+    print("\n  DIFFERENTIALS")
     print(f"    Avg top-50 hits:   {avg_diff_hits:.1f}/10 per GW")
     print()
 

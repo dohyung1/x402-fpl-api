@@ -10,9 +10,11 @@ Returns a team's live score during an active gameweek:
 
 import asyncio
 
+from app.algorithms import POSITION_MAP
 from app.fpl_client import (
     get_bootstrap,
     get_current_gameweek,
+    get_event_status,
     get_team_history,
     get_team_picks,
 )
@@ -20,17 +22,16 @@ from app.fpl_client import (
     get_live_points as fpl_live,
 )
 
-POSITION_MAP = {1: "GKP", 2: "DEF", 3: "MID", 4: "FWD"}
-
 
 async def get_live_points(team_id: int) -> dict:
     bootstrap = await get_bootstrap()
     current_gw = get_current_gameweek(bootstrap)
 
-    picks_data, live_data, history_data = await asyncio.gather(
+    picks_data, live_data, history_data, event_status = await asyncio.gather(
         get_team_picks(team_id, current_gw),
         fpl_live(current_gw),
         get_team_history(team_id),
+        get_event_status(),
     )
 
     players_by_id = {p["id"]: p for p in bootstrap["elements"]}
@@ -128,7 +129,27 @@ async def get_live_points(team_id: int) -> dict:
     # GW rank estimate: compare to current average points
     gw_event = next((e for e in bootstrap["events"] if e["id"] == current_gw), {})
     avg_points = gw_event.get("average_entry_score", 50)
+    highest_score = gw_event.get("highest_score")
     points_vs_avg = total_live - avg_points
+
+    # Top scorer this GW
+    top_element_id = gw_event.get("top_element")
+    top_element_info = None
+    if top_element_id:
+        top_p = players_by_id.get(top_element_id)
+        if top_p:
+            top_element_info = {
+                "name": top_p["web_name"],
+                "team": teams.get(top_p.get("team"), {}).get("short_name", "?"),
+                "points": live_points_for(top_element_id),
+            }
+
+    # Bonus points status from event-status endpoint
+    bonus_confirmed = False
+    status_entries = event_status.get("status", [])
+    if status_entries:
+        # All days must have bonus_added=True for bonus to be fully confirmed
+        bonus_confirmed = all(s.get("bonus_added", False) for s in status_entries)
 
     return {
         "team_id": team_id,
@@ -136,12 +157,19 @@ async def get_live_points(team_id: int) -> dict:
         "active_chip": active_chip,
         "live_total": total_live,
         "gameweek_average": avg_points,
+        "highest_score": highest_score,
         "points_vs_average": round(points_vs_avg, 1),
         "rank_estimate": (
             "Above average" if points_vs_avg > 5 else "Average" if points_vs_avg >= -5 else "Below average"
         ),
+        "top_scorer": top_element_info,
         "starters": starter_data,
         "bench": bench_data,
         "auto_sub_scenarios": auto_sub_scenarios,
-        "note": "Live points update during matches. Bonus points are projected and may change.",
+        "bonus_status": "confirmed" if bonus_confirmed else "provisional",
+        "note": (
+            "Live points update during matches. Bonus points are confirmed."
+            if bonus_confirmed
+            else "Live points update during matches. Bonus points are projected and may change."
+        ),
     }

@@ -105,17 +105,90 @@ INJURY_PATTERNS = [
 
 # Common non-player words to filter out of regex matches
 STOP_WORDS = {
-    "the", "this", "that", "your", "my", "our", "his", "her", "a", "an", "it",
-    "is", "was", "are", "were", "be", "been", "being", "have", "has", "had",
-    "do", "does", "did", "will", "would", "could", "should", "can", "may",
-    "might", "must", "shall", "not", "no", "yes", "so", "if", "then",
-    "but", "and", "or", "for", "to", "in", "on", "at", "by", "of", "from",
-    "up", "out", "with", "as", "into", "about", "like", "just", "very",
-    "really", "actually", "definitely", "probably", "maybe", "absolutely",
-    "honestly", "obviously", "certainly", "basically", "essentially",
-    "bench boost", "triple captain", "free hit", "wildcard",
-    "gameweek", "fantasy", "premier league", "fpl", "points",
-    "i think", "you know", "i mean", "going to", "want to",
+    "the",
+    "this",
+    "that",
+    "your",
+    "my",
+    "our",
+    "his",
+    "her",
+    "a",
+    "an",
+    "it",
+    "is",
+    "was",
+    "are",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "can",
+    "may",
+    "might",
+    "must",
+    "shall",
+    "not",
+    "no",
+    "yes",
+    "so",
+    "if",
+    "then",
+    "but",
+    "and",
+    "or",
+    "for",
+    "to",
+    "in",
+    "on",
+    "at",
+    "by",
+    "of",
+    "from",
+    "up",
+    "out",
+    "with",
+    "as",
+    "into",
+    "about",
+    "like",
+    "just",
+    "very",
+    "really",
+    "actually",
+    "definitely",
+    "probably",
+    "maybe",
+    "absolutely",
+    "honestly",
+    "obviously",
+    "certainly",
+    "basically",
+    "essentially",
+    "bench boost",
+    "triple captain",
+    "free hit",
+    "wildcard",
+    "gameweek",
+    "fantasy",
+    "premier league",
+    "fpl",
+    "points",
+    "i think",
+    "you know",
+    "i mean",
+    "going to",
+    "want to",
 }
 
 
@@ -149,12 +222,14 @@ async def get_community_consensus(gameweek: int | None = None) -> dict:
             logger.warning("Channel %s failed: %s", ch["name"], result)
             sources.append({"name": ch["name"], "videos_analyzed": 0, "status": f"error: {result}"})
             continue
-        sources.append({
-            "name": ch["name"],
-            "videos_analyzed": result["video_count"],
-            "videos": result.get("video_titles", []),
-            "status": "ok" if result["video_count"] > 0 else "no_recent_videos",
-        })
+        sources.append(
+            {
+                "name": ch["name"],
+                "videos_analyzed": result["video_count"],
+                "videos": result.get("video_titles", []),
+                "status": "ok" if result["video_count"] > 0 else "no_recent_videos",
+            }
+        )
         all_insights.extend(result["insights"])
 
     # Build consensus from all channel insights
@@ -202,7 +277,7 @@ async def _resolve_channel_id(handle: str) -> str | None:
             if not match:
                 match = re.search(r'"channelId"\s*:\s*"(UC[\w-]+)"', html)
             if not match:
-                match = re.search(r'channel_id=(UC[\w-]+)', html)
+                match = re.search(r"channel_id=(UC[\w-]+)", html)
 
             if match:
                 channel_id = match.group(1)
@@ -228,7 +303,7 @@ async def _fetch_rss_feed(channel_id: str) -> list[dict]:
     videos = []
     cutoff = datetime.now(timezone.utc).timestamp() - (MAX_AGE_DAYS * 86400)
 
-    for entry in entries[:MAX_VIDEOS_PER_CHANNEL * 2]:  # fetch extra, filter by date
+    for entry in entries[: MAX_VIDEOS_PER_CHANNEL * 2]:  # fetch extra, filter by date
         title = entry.findtext(f"{ATOM_NS}title", "")
         published = entry.findtext(f"{ATOM_NS}published", "")
         video_id_el = entry.find(f"{ATOM_NS}id")
@@ -249,20 +324,48 @@ async def _fetch_rss_feed(channel_id: str) -> list[dict]:
         # Filter for FPL-related videos by title
         # These are dedicated FPL channels, so be lenient — most of their content is FPL
         title_lower = title.lower()
-        is_fpl = any(kw in title_lower for kw in [
-            "fpl", "fantasy", "gameweek", "gw", "captain", "transfer", "wildcard",
-            "bench boost", "free hit", "triple captain", "chip", "differential",
-            "premier league", "blank", "dgw", "bgw", "draft", "team selection",
-            "buy", "sell", "keep", "avoid", "preview", "review", "tips",
-            "deadline", "points", "rank",
-        ])
+        is_fpl = any(
+            kw in title_lower
+            for kw in [
+                "fpl",
+                "fantasy",
+                "gameweek",
+                "gw",
+                "captain",
+                "transfer",
+                "wildcard",
+                "bench boost",
+                "free hit",
+                "triple captain",
+                "chip",
+                "differential",
+                "premier league",
+                "blank",
+                "dgw",
+                "bgw",
+                "draft",
+                "team selection",
+                "buy",
+                "sell",
+                "keep",
+                "avoid",
+                "preview",
+                "review",
+                "tips",
+                "deadline",
+                "points",
+                "rank",
+            ]
+        )
 
         if video_id and is_fpl:
-            videos.append({
-                "video_id": video_id,
-                "title": title,
-                "published": published,
-            })
+            videos.append(
+                {
+                    "video_id": video_id,
+                    "title": title,
+                    "published": published,
+                }
+            )
 
         if len(videos) >= MAX_VIDEOS_PER_CHANNEL:
             break
@@ -371,9 +474,7 @@ def _match_to_player_name(name: str, player_names: set[str]) -> str | None:
     return None
 
 
-def _extract_from_patterns(
-    text: str, patterns: list[re.Pattern], player_names: set[str]
-) -> list[str]:
+def _extract_from_patterns(text: str, patterns: list[re.Pattern], player_names: set[str]) -> list[str]:
     """Extract player names matching patterns, grounded against FPL player list."""
     found = []
     for pattern in patterns:
@@ -399,9 +500,7 @@ def _extract_players_from_title(title: str, player_names: set[str]) -> list[str]
     return found
 
 
-def _extract_insights(
-    transcript: str, title: str, player_names: set[str], channel_name: str
-) -> dict:
+def _extract_insights(transcript: str, title: str, player_names: set[str], channel_name: str) -> dict:
     """Extract FPL insights from a video transcript (or title-only if no transcript)."""
     # Combine title and transcript for searching
     full_text = f"{title} {transcript}"
@@ -549,12 +648,14 @@ def _build_consensus(insights: list[dict], player_names: set[str]) -> dict:
     # Build chip consensus
     chip_advice = []
     for key, entries in chip_counts.items():
-        chip_advice.append({
-            "chip": entries[0]["chip"],
-            "suggested_gw": entries[0]["gameweek"],
-            "mentioned_by": [e["channel"] for e in entries],
-            "count": len(entries),
-        })
+        chip_advice.append(
+            {
+                "chip": entries[0]["chip"],
+                "suggested_gw": entries[0]["gameweek"],
+                "mentioned_by": [e["channel"] for e in entries],
+                "count": len(entries),
+            }
+        )
     chip_advice.sort(key=lambda x: x["count"], reverse=True)
 
     # Build injury flags
@@ -582,14 +683,14 @@ def _build_consensus(insights: list[dict], player_names: set[str]) -> dict:
                 dgw_counts[gw].append(channel)
 
     bgw_consensus = sorted(
-        [{"gameweek": gw, "mentioned_by": channels, "count": len(channels)}
-         for gw, channels in bgw_counts.items()],
-        key=lambda x: x["count"], reverse=True,
+        [{"gameweek": gw, "mentioned_by": channels, "count": len(channels)} for gw, channels in bgw_counts.items()],
+        key=lambda x: x["count"],
+        reverse=True,
     )
     dgw_consensus = sorted(
-        [{"gameweek": gw, "mentioned_by": channels, "count": len(channels)}
-         for gw, channels in dgw_counts.items()],
-        key=lambda x: x["count"], reverse=True,
+        [{"gameweek": gw, "mentioned_by": channels, "count": len(channels)} for gw, channels in dgw_counts.items()],
+        key=lambda x: x["count"],
+        reverse=True,
     )
 
     return {
