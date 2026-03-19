@@ -79,6 +79,7 @@ async def get_live_points(team_id: int) -> dict:
             "projected_bonus": bonus_for(element_id),
             "minutes_played": minutes_for(element_id),
             "played": minutes_for(element_id) > 0,
+            "chance_of_playing": p.get("chance_of_playing_this_round"),
         }
 
     starter_data = [enrich(p) for p in starters]

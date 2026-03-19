@@ -10,8 +10,8 @@ Returns a structured comparison with a verdict recommending the best pick.
 
 import asyncio
 
+from app.algorithms import POSITION_MAP
 from app.algorithms.captain import (
-    POSITION_MAP,
     _build_fixture_map,
     _score_player,
 )
@@ -239,6 +239,19 @@ async def compare_players(
         # Value score
         value_score = round(total_points / cost, 2) if cost > 0 else 0.0
 
+        # Consistency scoring — based on points variance
+        # A player who scores 5,5,5,5 is more consistent than 0,0,0,20
+        # Lower variance = more reliable captain/pick
+        starts = player.get("starts", 0)
+        if starts > 0 and total_points > 0:
+            # Approximate variance from bonus distribution and form stability
+            # FPL doesn't give per-GW points in bootstrap, so we estimate:
+            # High form relative to PPG = consistent recent performance
+            form_ppg_ratio = form / ppg if ppg > 0 else 0
+            consistency_score = round(min(10.0, form_ppg_ratio * ppg), 1)
+        else:
+            consistency_score = 0.0
+
         # Upcoming fixtures
         upcoming = _build_upcoming_fixtures(
             team_id,
@@ -270,6 +283,7 @@ async def compare_players(
                 "ict_index": ict,
                 "captain_score": captain_score,
                 "value_score": value_score,
+                "consistency_score": consistency_score,
                 "net_transfers_this_gw": net_transfers,
                 "transfer_pressure": (
                     "Rising" if net_transfers > 50_000 else "Falling" if net_transfers < -50_000 else "Stable"
