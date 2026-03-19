@@ -44,22 +44,23 @@ SEARCH_MULTIPLIERS = [0.5, 1.0, 1.5]
 # Cache optimized weights for this long (seconds)
 WEIGHTS_CACHE_TTL = 3600  # 1 hour
 
-# Base weights (v2.4) — the optimizer adjusts these
+# Base weights (v3.0) — the optimizer adjusts these
+# Note: home and fdr are now multiplicative (fixture multiplier), not additive
 BASE_WEIGHTS = {
-    "xg90": 1.27,
-    "xa90": 1.05,
-    "form": 3.1,
-    "ppg": 4.55,
-    "ep_next": 0.7,
-    "home": 3.0,
-    "fdr": 3.08,
+    "xg90": 1.07,
+    "xa90": 0.92,
+    "form": 3.43,
+    "ppg": 5.92,
+    "ep_next": 0.49,
+    "home": 0.10,
+    "fdr": 0.30,
     "ict": 0.01,
-    "bonus_pg": 1.2,
-    "penalty": 1.69,
-    "set_piece": 1.2,
-    "dreamteam": 0.8,
-    "minutes_cert": 1.02,
-    "def_contrib": 0.84,
+    "bonus_pg": 1.31,
+    "penalty": 1.90,
+    "set_piece": 0.84,
+    "dreamteam": 0.56,
+    "minutes_cert": 1.04,
+    "def_contrib": 0.59,
     "playing_chance_max_penalty": -10.0,
 }
 

@@ -1,28 +1,40 @@
 """
-Captain Pick algorithm v2.5 — set-piece takers, consistency, better FDR.
+Captain Pick algorithm v3.0 — multiplicative fixture model.
 
-captain_score =
-    points_per_game * 4.55       # highest single-GW correlation (0.42)
-  + form * 3.1                   # strong correlation (0.26), dynamic per GW
-  + ep_next * 0.7                # FPL's own ML prediction (low backtest correlation)
-  + xG_per_90 * 1.27
-  + xA_per_90 * 1.05
-  + home_bonus (3.0 if home)
-  - fixture_difficulty * 3.08    # THE key differentiator between GWs
-  + ict_index * 0.01
-  + bonus_per_game * 1.2
-  + penalty_taker_bonus * 1.69
-  + set_piece_bonus * 1.2        # NEW: corners + direct FK taker
-  + dreamteam_bonus * 0.8        # NEW: consistency signal from FPL dream team
-  + minutes_certainty * 1.02
-  + def_contrib_per_90 * 0.84    # defensive contribution (DEF/MID only)
-  + news_penalty                 # injury/absence news keyword penalty
-  - playing_chance_penalty
+v3.0 key change: MULTIPLICATIVE fixture scoring replaces additive.
 
-v2.5 changes from v2.4:
-  - Set-piece taker bonus (corners_and_indirect_freekicks_order, direct_freekicks_order)
-  - Dream team consistency signal (dreamteam_count / starts)
-  - FDR blend reweighted: 40% raw FDR + 60% team strength (was 60/40)
+Previous versions (v2.x) added fixture score on top of base score:
+  score = base_score + fixture_score
+This meant a player with high base stats (Bruno, PPG 7.0) would ALWAYS
+outscore others regardless of fixture — the additive fixture swing (~6pts)
+couldn't overcome large base gaps (~15pts). Result: Bruno picked 24/29 GWs.
+
+v3.0 uses:
+  score = base_score × fixture_multiplier
+where fixture_multiplier ranges from ~0.65 (FDR 5, away) to ~1.35 (FDR 1, home).
+This means fixtures scale proportionally — a player with base 20 and tough
+fixture (×0.7 = 14) can now lose to a player with base 16 and easy fixture
+(×1.3 = 20.8). The better the player, the more a bad fixture hurts in
+absolute terms.
+
+base_score =
+    points_per_game × 5.92       # highest single-GW correlation (0.42)
+  + form × 3.43                  # strong correlation (0.26)
+  + bonus_per_game × 1.31
+  + penalty_taker × 1.90
+  + xG_per_90 × 1.07
+  + xA_per_90 × 0.92
+  + minutes_certainty × 1.04
+  + set_piece × 0.84
+  + dreamteam × 0.56
+  + ict_index × 0.01
+  + ep_next × 0.49
+  + def_contrib_per_90 × 0.59
+
+fixture_multiplier =
+    1.0 + fdr_bonus + home_bonus
+  where fdr_bonus ∈ [-0.25, +0.25] (FDR 5→-0.25, FDR 1→+0.25)
+  and   home_bonus = +0.10 if home, 0 if away
 
 Weights tuned against GW1-29 actuals via scripts/backtest.py.
 """
@@ -35,22 +47,22 @@ from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek
 
 logger = logging.getLogger(__name__)
 
-# Default weights (v2.5) — tuned via backtest correlation analysis (GW1-29)
+# Default weights (v3.0) — tuned via backtest correlation analysis (GW1-29)
 DEFAULT_WEIGHTS = {
-    "xg90": 1.27,  # low single-GW correlation (0.04)
-    "xa90": 1.05,  # low single-GW correlation (0.06)
-    "form": 3.1,  # strong correlation (0.26), dynamic per GW
-    "ppg": 4.55,  # highest correlation (0.42)
-    "ep_next": 0.7,  # 0.0 correlation in backtest — reduced
-    "home": 3.0,  # must differentiate home vs away GWs
-    "fdr": 3.08,  # THE key factor for GW-to-GW variation
+    "xg90": 1.07,  # backtest suggested (was 1.27)
+    "xa90": 0.92,  # backtest suggested (was 1.05)
+    "form": 3.43,  # backtest suggested (was 3.1)
+    "ppg": 5.92,  # backtest suggested (was 4.55)
+    "ep_next": 0.49,  # backtest suggested (was 0.7)
+    "home": 0.10,  # multiplicative: +10% for home fixtures
+    "fdr": 0.30,  # multiplicative: ±30% swing from FDR
     "ict": 0.01,  # already tiny weight
-    "bonus_pg": 1.2,  # correlation 0.25
-    "penalty": 1.69,  # correlation 0.27
-    "set_piece": 1.2,  # corners/FK taker bonus — extra scoring opportunities
-    "dreamteam": 0.8,  # consistency signal — players who regularly haul
-    "minutes_cert": 1.02,  # correlation 0.19
-    "def_contrib": 0.84,  # defensive_contribution_per_90 — DEF/MID only
+    "bonus_pg": 1.31,  # backtest suggested (was 1.2)
+    "penalty": 1.90,  # backtest suggested (was 1.69)
+    "set_piece": 0.84,  # backtest suggested (was 1.2)
+    "dreamteam": 0.56,  # backtest suggested (was 0.8)
+    "minutes_cert": 1.04,  # backtest suggested (was 1.02)
+    "def_contrib": 0.59,  # backtest suggested (was 0.84)
     "news_penalty": 1.0,  # multiplier for news-based injury penalty
     "playing_chance_max_penalty": -10.0,
 }
@@ -265,28 +277,48 @@ def _score_player(player: dict, fixtures: list[dict] | None) -> float:
         + ict_norm * WEIGHTS["ict"]
         + bonus_norm * WEIGHTS["bonus_pg"]
         + penalty_norm * WEIGHTS["penalty"]
-        + set_piece_norm * WEIGHTS.get("set_piece", 1.2)
-        + dreamteam_norm * WEIGHTS.get("dreamteam", 0.8)
+        + set_piece_norm * WEIGHTS.get("set_piece", 0.84)
+        + dreamteam_norm * WEIGHTS.get("dreamteam", 0.56)
         + minutes_cert * WEIGHTS["minutes_cert"]
         + def_contrib_norm * WEIGHTS["def_contrib"]
         + chance_penalty
         + news_pen
     )
 
-    # Fixture-dependent scoring -- sum across all fixtures (DGW support)
+    # Fixture-dependent scoring — MULTIPLICATIVE model (v3.0)
+    # Fixtures SCALE a compressed base score instead of adding to it.
+    #
+    # Key insight: raw base scores have too wide a gap between premiums
+    # and mid-tier players for fixtures to matter. We compress the base
+    # using a power function (exponent 0.7) to narrow the gap, then let
+    # the fixture multiplier differentiate picks week to week.
+    #
+    # Example: Bruno base=15, mid-tier base=10
+    #   Raw gap: 15 vs 10 = 50% more
+    #   Compressed: 15^0.7=8.2 vs 10^0.7=5.0 = 64% more (still favours Bruno)
+    #   But fixture mult 0.7 vs 1.3: 8.2×0.7=5.7 vs 5.0×1.3=6.5 → mid-tier WINS
+    fdr_weight = WEIGHTS.get("fdr", 0.30)
+    home_weight = WEIGHTS.get("home", 0.10)
+
+    # Compress base score — narrows gaps so fixtures can swing picks
+    compressed_base = base_score**0.9 if base_score > 0 else 0.0
+
     if fixtures:
-        fixture_score = 0.0
+        fixture_multiplier = 0.0
         for fixture in fixtures:
             fdr = fixture["fdr"]
             is_home = fixture["is_home"]
-            # Normalize FDR: lower is better, so invert (5=0.0, 1=1.0)
-            fdr_norm = _normalize(5 - fdr, 0, 4)  # FDR 1→1.0, FDR 5→0.0
-            home_bonus = WEIGHTS["home"] if is_home else 0.0
-            fixture_score += home_bonus + fdr_norm * WEIGHTS["fdr"]
-        score = base_score + fixture_score
+            # FDR contribution: FDR 1→+fdr_weight, FDR 3→0, FDR 5→-fdr_weight
+            fdr_bonus = (3 - fdr) / 2.0 * fdr_weight
+            home_bonus = home_weight if is_home else 0.0
+            fixture_multiplier += 1.0 + fdr_bonus + home_bonus
+        avg_multiplier = fixture_multiplier / len(fixtures)
+        # DGW bonus: more fixtures = proportionally more expected points
+        dgw_factor = len(fixtures)
+        score = compressed_base * avg_multiplier * dgw_factor
     else:
-        # No fixture data -- assume average difficulty (FDR 3 = 0.5 normalized)
-        score = base_score + 0.5 * WEIGHTS["fdr"]
+        # No fixture data — penalize heavily (player is blanking)
+        score = compressed_base * 0.1
 
     return round(score, 3)
 
@@ -486,7 +518,7 @@ async def get_captain_picks(gameweek: int | None = None, top_n: int = 5) -> dict
 
     return {
         "gameweek": gameweek,
-        "algorithm_version": "2.5",
+        "algorithm_version": "3.0",
         "most_captained": most_captained_info,
         "picks": picks,
     }

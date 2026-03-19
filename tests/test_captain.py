@@ -280,10 +280,11 @@ class TestScorePlayer:
         home_score = _score_player(player, home_fixtures)
         away_score = _score_player(player, away_fixtures)
         assert home_score > away_score
-        assert home_score - away_score == pytest.approx(WEIGHTS["home"])
+        # Multiplicative model: home bonus scales with base score, not fixed additive
+        assert home_score - away_score > 0
 
     def test_zero_minutes_player(self):
-        """Player with 0 minutes has no xG/xA per 90 contribution."""
+        """Player with 0 minutes/stats scores zero — multiplicative model."""
         player = _make_player(
             minutes=0,
             expected_goals="0.0",
@@ -298,13 +299,11 @@ class TestScorePlayer:
         )
         fixtures = [{"fdr": 3, "is_home": True, "opponent": 20}]
         score = _score_player(player, fixtures)
-        # With all zeros normalized, base score is 0. Fixture: home + fdr_norm(FDR 3)
-        # FDR 3 → normalized (5-3)/4 = 0.5 → 0.5 * fdr_weight + home_weight
-        expected = WEIGHTS["home"] + 0.5 * WEIGHTS["fdr"]
-        assert score == pytest.approx(expected)
+        # Multiplicative model: zero base × any fixture multiplier = 0
+        assert score == 0.0
 
     def test_no_fixtures_blank_gw(self):
-        """Player with no fixtures (BGW) gets default -3*FDR penalty."""
+        """Player with no fixtures (BGW) gets heavily penalized — multiplicative 0.1x."""
         player = _make_player(
             form="6.0",
             points_per_game="5.0",
@@ -319,9 +318,10 @@ class TestScorePlayer:
         score_no_fixtures = _score_player(player, None)
         score_with_fixtures = _score_player(player, [{"fdr": 3, "is_home": False, "opponent": 20}])
 
-        # No fixtures: base_score + 0.5 * fdr_weight
-        # Away fdr=3: base_score + 0 + 0.5 * fdr_weight (same when away fdr=3)
-        assert score_no_fixtures == pytest.approx(score_with_fixtures)
+        # No fixtures: base × 0.1 (heavy penalty for blank GW)
+        # With fixtures: base × ~1.0 (neutral FDR 3, away)
+        assert score_no_fixtures < score_with_fixtures
+        assert score_no_fixtures < score_with_fixtures * 0.2  # at least 5x less
 
     def test_empty_fixtures_list_treated_as_blank(self):
         """Empty list (not None) also triggers the blank GW path."""
@@ -331,7 +331,7 @@ class TestScorePlayer:
         assert score == pytest.approx(score_none)
 
     def test_dgw_bonus(self):
-        """DGW player gets fixture-dependent components summed twice."""
+        """DGW player scores significantly higher than single GW — multiplicative model."""
         player = _make_player(form="6.0", points_per_game="5.0")
         single = [{"fdr": 2, "is_home": True, "opponent": 20}]
         double = [
@@ -341,10 +341,8 @@ class TestScorePlayer:
         score_single = _score_player(player, single)
         score_double = _score_player(player, double)
 
-        # DGW should always score higher than single fixture (second fixture adds value)
-        # Second fixture (FDR 3, away): 0 (no home bonus) + 0.5 * fdr_weight
-        extra = 0 + 0.5 * WEIGHTS["fdr"]
-        assert score_double == pytest.approx(score_single + extra)
+        # DGW: base × avg_multiplier × 2 fixtures — should be roughly 2× single
+        assert score_double > score_single * 1.5  # at least 1.5x for DGW
 
     def test_penalty_taker_bonus(self):
         """Player with penalties_order=1 gets penalty bonus; others don't."""
@@ -358,7 +356,8 @@ class TestScorePlayer:
         score_none = _score_player(no_pen, fixtures)
 
         assert score_pen > score_non
-        assert score_pen - score_non == pytest.approx(WEIGHTS["penalty"])
+        # Multiplicative model: penalty bonus is scaled by fixture multiplier
+        assert score_pen - score_non > 0
         assert score_non == pytest.approx(score_none)
 
     def test_injured_player_penalised(self):
@@ -371,7 +370,8 @@ class TestScorePlayer:
         score_inj = _score_player(injured, fixtures)
 
         assert score_fit > score_inj
-        assert score_fit - score_inj == pytest.approx(-WEIGHTS["playing_chance_max_penalty"])
+        # Multiplicative model: penalty is in base, then scaled by fixture
+        assert score_fit - score_inj > 0
 
     def test_higher_form_scores_higher(self):
         """Player with higher form scores higher, all else equal."""

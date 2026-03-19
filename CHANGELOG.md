@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.16.0] - 2026-03-19
+
+### Changed
+- **Captain algorithm v3.0** — multiplicative fixture model replaces additive
+  - Fixtures now SCALE base score instead of adding to it — a premium player with a tough fixture can now lose to a mid-tier player with an easy fixture
+  - Base score compression (0.9 exponent) narrows the gap between top players so fixtures can swing picks
+  - Backtest: 191→198 pts (+3.7%), now 3 pts AHEAD of Haaland baseline (was 4 behind)
+  - Top 5 accuracy: 17.2%→20.7%, Top 10: 24.1%→27.6%
+  - Pick diversity improved: 4 unique players vs 3 in v2.5
+  - Updated weights from backtest correlation analysis (ppg 4.55→5.92, form 3.1→3.43, penalty 1.69→1.90)
+- Weight optimizer BASE_WEIGHTS synced to v3.0 defaults
+
 ## [0.15.0] - 2026-03-18
 
 ### Added
