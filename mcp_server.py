@@ -629,39 +629,6 @@ async def squad_scout(team_id: int) -> dict:
         return _error("Failed to scout squad. Check that the team ID is correct and try again.")
 
 
-@mcp.tool()
-async def community_consensus(gameweek: int | None = None) -> dict:
-    """
-    Get consensus FPL advice from top YouTube creators (FPL Mate, Let's Talk FPL,
-    FPL Harry, FPL Focal, FPL Raptor).
-
-    USE THIS WHEN the user asks: "What are the YouTubers saying?", "Community consensus?",
-    "What do the experts recommend?", "Who are FPL creators captaining?",
-    "What transfers are the experts making?", or any question about community opinion.
-
-    Fetches recent videos, analyzes transcripts, and finds consensus on:
-    - Captain picks (who are most creators captaining?)
-    - Transfer targets (who are they bringing in/selling?)
-    - Chip timing (when do they recommend using chips?)
-    - Team news and injuries (what have they heard?)
-
-    Args:
-        gameweek: Gameweek number (1-38). Defaults to next gameweek if not specified.
-    """
-    if gameweek is not None:
-        if err := _validate_gameweek(gameweek):
-            return _error(err)
-    try:
-        from app.algorithms.consensus import get_community_consensus
-
-        return await get_community_consensus(gameweek=gameweek)
-    except Exception:
-        logger.exception("community_consensus failed")
-        return _error(
-            "Failed to get community consensus. YouTube transcripts may be temporarily unavailable — try again."
-        )
-
-
 # ---------------------------------------------------------------------------
 # MCP Resources — static/reference data Claude can read as context
 # ---------------------------------------------------------------------------
@@ -790,21 +757,6 @@ def price_change_alert() -> str:
         "- Are any of the risers worth buying even if I wasn't planning a transfer?\n"
         "- Are any of the fallers players I should panic-sell?\n"
         "Keep it actionable — tell me exactly what to do before tonight's deadline."
-    )
-
-
-@mcp.prompt()
-def what_are_experts_saying() -> str:
-    """Get consensus FPL advice from top YouTube creators for this gameweek."""
-    return (
-        "Use the community_consensus tool to get the latest consensus from top FPL "
-        "YouTube creators. Then give me a briefing:\n"
-        "- Who are the experts captaining and is there strong agreement?\n"
-        "- What transfers are they making — any common targets?\n"
-        "- Any chip advice for upcoming gameweeks?\n"
-        "- What team news or injuries are they flagging?\n"
-        "- Where do the experts DISAGREE — and who do you side with?\n"
-        "Give me a clear summary I can act on before the deadline."
     )
 
 

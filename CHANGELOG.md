@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.17.0] - 2026-03-20
+
+### Removed
+- **`community_consensus` tool** — removed YouTube transcript-based consensus feature due to unreliable YouTube transcript API (IP blocking, rate limiting). Reduces dependencies and attack surface.
+- **`youtube-transcript-api` dependency** — no longer needed
+
+### Fixed
+- **Player name matching accuracy** — consensus name extraction no longer matches inactive/departed players (e.g., Bamford with 0 minutes) or produces false positives from short names (Ba, Son, Cox)
+
 ## [0.16.0] - 2026-03-19
 
 ### Changed

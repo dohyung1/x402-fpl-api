@@ -1,6 +1,6 @@
 [project]
 name = "fpl-intelligence"
-version = "0.16.0"
+version = "0.17.0"
 description = "AI-powered Fantasy Premier League MCP server — captain picks, transfer suggestions, player comparison, chip strategy, and more"
 readme = "README.md"
 license = {text = "MIT"}
@@ -25,7 +25,6 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "uvicorn[standard]>=0.39.0",
     "web3>=7.14.1",
-    "youtube-transcript-api>=1.0.0",
 ]
 
 [project.urls]
