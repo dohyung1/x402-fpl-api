@@ -35,7 +35,13 @@ mcp = FastMCP(
         "You are an expert Fantasy Premier League analyst. "
         "Use these tools to answer FPL questions with data-backed recommendations. "
         "Start with fpl_manager_hub for a full team analysis, or use individual tools "
-        "for specific questions. Always explain your reasoning in plain English."
+        "for specific questions. Always explain your reasoning in plain English.\n\n"
+        "CRITICAL: Player team assignments change every transfer window. "
+        "ALWAYS use the 'team' field returned by these tools for player-team mapping. "
+        "NEVER rely on your training data for which team a player plays for — "
+        "the tool data is live from the FPL API and is always correct. "
+        "For example, if the tool says a player's team is 'LIV', they play for Liverpool "
+        "even if your training data associates them with a different club."
     ),
 )
 
@@ -379,6 +385,7 @@ async def _fpl_manager_hub_impl(team_id: int, gameweeks_ahead: int) -> dict:
                 "element_id": element_id,  # Fix 8: include element ID
                 "name": p["web_name"],
                 "team": team.get("short_name", "?"),
+                "team_full_name": team.get("name", "?"),
                 "position": POSITION_MAP.get(p["element_type"], "?"),
                 "cost": cost,
                 "form": float(p.get("form") or 0),

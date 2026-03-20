@@ -153,6 +153,7 @@ async def get_differentials(
                     "id": player["id"],
                     "name": player["web_name"],
                     "team": team.get("short_name", "?"),
+                    "team_full_name": team.get("name", "?"),
                     "position": POSITION_MAP.get(player["element_type"], "?"),
                     "cost": player["now_cost"] / 10,
                     "selected_by_pct": float(player.get("selected_by_percent") or 0),

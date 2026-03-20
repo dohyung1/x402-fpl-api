@@ -269,6 +269,7 @@ async def compare_players(
                 "full_name": f"{player.get('first_name', '')} {player.get('second_name', '')}",
                 "id": player["id"],
                 "team": team.get("short_name", "?"),
+                "team_full_name": team.get("name", "?"),
                 "position": POSITION_MAP.get(player["element_type"], "?"),
                 "cost": cost,
                 "ownership_pct": ownership,

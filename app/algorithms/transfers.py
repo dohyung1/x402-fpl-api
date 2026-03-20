@@ -186,6 +186,7 @@ async def get_transfer_suggestions(
                         "id": p["id"],
                         "name": p["web_name"],
                         "team": teams.get(p["team"], {}).get("short_name", "?"),
+                        "team_full_name": teams.get(p["team"], {}).get("name", "?"),
                         "position": POSITION_MAP.get(p["element_type"], "?"),
                         "cost": p["now_cost"] / 10,
                         "form": float(p.get("form") or 0),

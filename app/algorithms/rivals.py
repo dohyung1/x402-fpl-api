@@ -230,6 +230,7 @@ def _format_player_list(
             {
                 "name": p["web_name"],
                 "team": team_short,
+                "team_full_name": teams_by_id.get(p["team"], {}).get("name", "?"),
                 "form": float(p.get("form") or 0),
                 "points_per_game": float(p.get("points_per_game") or 0),
                 "cost": p.get("now_cost", 0) / 10,

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.17.1] - 2026-03-20
+
+### Fixed
+- **Blank-GW player exclusion** — captain picks, differentials, transfer suggestions, and fixture outlook no longer recommend players with no fixture in the current gameweek
+- **Player team hallucination prevention** — added `team_full_name` to all tool outputs and MCP server instructions telling Claude to always trust API data over training knowledge for player-team assignments
+
 ## [0.17.0] - 2026-03-20
 
 ### Removed
