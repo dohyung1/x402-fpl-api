@@ -173,6 +173,8 @@ async def get_transfer_suggestions(
             if p["id"] in {s["id"] for s in squad}:
                 continue
             player_fixtures = fixture_map.get(p["team"])
+            if not player_fixtures:
+                continue  # skip players with no fixture this GW (blank gameweek)
             future_fixes = [fm.get(p["team"], []) for fm in future_fixture_maps]
             score = _player_value_score(p, player_fixtures, future_fixes)
             if score > sell["value_score"]:

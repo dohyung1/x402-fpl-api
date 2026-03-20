@@ -112,6 +112,8 @@ async def get_differentials(
             continue
 
         player_fixtures = fixture_map.get(player["team"])
+        if not player_fixtures:
+            continue  # skip players with no fixture this GW (blank gameweek)
         score = _differential_score(player, player_fixtures, ownership)
         scored.append((score, player, player_fixtures))
 

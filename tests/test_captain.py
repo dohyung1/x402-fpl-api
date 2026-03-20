@@ -752,7 +752,7 @@ class TestGetCaptainPicks:
 
     @pytest.mark.asyncio
     async def test_all_blank_gw(self):
-        """All players with no fixtures still get scored (with default FDR)."""
+        """Players with no fixtures in this GW are excluded entirely."""
         players = [
             _make_player(id=1, web_name="PlayerA", team=14, form="6.0"),
             _make_player(id=2, web_name="PlayerB", team=15, form="4.0"),
@@ -766,7 +766,4 @@ class TestGetCaptainPicks:
 
             result = await get_captain_picks(gameweek=30, top_n=2)
 
-        assert len(result["picks"]) == 2
-        # All players should have fixture=None
-        for pick in result["picks"]:
-            assert pick["fixture"] is None
+        assert len(result["picks"]) == 0  # blank-GW players excluded

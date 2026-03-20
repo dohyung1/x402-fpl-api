@@ -112,10 +112,19 @@ async def get_fixture_outlook(
     easiest_team_ids = {t["team_id"] for t in team_scores[:5]}
     players = bootstrap["elements"]
 
+    # Teams that have a fixture in the immediate next GW
+    teams_with_next_fixture = set()
+    for fix in fixtures:
+        if fix.get("event") == current_gw:
+            teams_with_next_fixture.add(fix["team_h"])
+            teams_with_next_fixture.add(fix["team_a"])
+
     target_players = []
     for p in players:
         if p["team"] not in easiest_team_ids:
             continue
+        if p["team"] not in teams_with_next_fixture:
+            continue  # skip players with no fixture this GW (blank gameweek)
         if position_filter and p["element_type"] not in position_filter:
             continue
         if p.get("status") in {"i", "u"}:

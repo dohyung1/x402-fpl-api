@@ -421,6 +421,8 @@ async def get_captain_picks(gameweek: int | None = None, top_n: int = 5) -> dict
     scored = []
     for player in bootstrap["elements"]:
         player_fixtures = fixture_map.get(player["team"])
+        if not player_fixtures:
+            continue  # skip players with no fixture this GW (blank gameweek)
         score = _score_player(player, player_fixtures)
         scored.append((score, player, player_fixtures))
 
