@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.18.0] - 2026-03-22
+
+### Added
+- **Accuracy audit system** (`scripts/accuracy_audit.py`) — validates all MCP tools against live FPL API data, catches team assignment errors, ghost players, blank-GW leaks, injured player recommendations, and stale data
+- **CI accuracy workflow** — runs Mon/Thu and on push to main, uploads audit reports as artifacts
+- **Blank-GW visibility in compare tool** — player comparison now explicitly shows blank gameweeks as `"opponent": "BLANK"` with a `blank_gameweeks` field
+
+### Fixed
+- **Doubtful/suspended player filtering** — differentials, fixtures, transfers, scout, and prices now use `INJURY_STATUSES` (i/d/s/u) instead of only filtering injured/unavailable (i/u)
+- **Transfer inner loop efficiency** — squad ID set computed once instead of per-candidate
+
 ## [0.17.1] - 2026-03-20
 
 ### Fixed
