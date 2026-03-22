@@ -5,7 +5,7 @@ Ranks teams by aggregate fixture difficulty over the next N gameweeks.
 Home fixtures are weighted lighter (home_weight=0.85) as home advantage eases difficulty.
 """
 
-from app.algorithms import POSITION_MAP
+from app.algorithms import INJURY_STATUSES, POSITION_MAP
 from app.algorithms.captain import _blend_fdr
 from app.fpl_client import get_bootstrap, get_current_gameweek, get_fixtures
 
@@ -127,7 +127,7 @@ async def get_fixture_outlook(
             continue  # skip players with no fixture this GW (blank gameweek)
         if position_filter and p["element_type"] not in position_filter:
             continue
-        if p.get("status") in {"i", "u"}:
+        if p.get("status") in INJURY_STATUSES:
             continue
         target_players.append(p)
 

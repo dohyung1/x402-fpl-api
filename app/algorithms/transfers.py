@@ -14,7 +14,7 @@ Uses NEXT gameweek by default (what managers are prepping for).
 
 import asyncio
 
-from app.algorithms import POSITION_MAP
+from app.algorithms import INJURY_STATUSES, POSITION_MAP
 from app.algorithms.captain import _build_fixture_map, _score_player
 from app.algorithms.news import format_news_for_reasoning, has_negative_news, news_penalty_score
 from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek, get_team_picks
@@ -150,6 +150,8 @@ async def get_transfer_suggestions(
     # The entry_history "value" field (if available) gives the actual
     # squad value including selling prices — but per-player is not exposed.
 
+    squad_ids = {s["id"] for s in squad}
+
     suggestions = []
     for sell in transfer_out_candidates:
         # Use current cost as selling estimate — user will see final budget
@@ -167,10 +169,10 @@ async def get_transfer_suggestions(
                 continue
             if p["now_cost"] / 10 > budget:
                 continue
-            if p.get("status") in {"i", "u"}:
+            if p.get("status") in INJURY_STATUSES:
                 continue
             # Don't suggest players already in squad
-            if p["id"] in {s["id"] for s in squad}:
+            if p["id"] in squad_ids:
                 continue
             player_fixtures = fixture_map.get(p["team"])
             if not player_fixtures:

@@ -13,7 +13,7 @@ differential_score =
 DGW support: fixture difficulty is the average across all fixtures in the GW.
 """
 
-from app.algorithms import POSITION_MAP
+from app.algorithms import INJURY_STATUSES, POSITION_MAP
 from app.algorithms.captain import _build_fixture_map
 from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek
 
@@ -108,7 +108,7 @@ async def get_differentials(
         ownership = float(player.get("selected_by_percent") or 0)
         if ownership > max_ownership_pct:
             continue
-        if player.get("status") in {"i", "u"}:  # skip injured/unavailable
+        if player.get("status") in INJURY_STATUSES:
             continue
 
         player_fixtures = fixture_map.get(player["team"])

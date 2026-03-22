@@ -1,0 +1,41 @@
+name: Accuracy Audit
+
+# Run twice a week (Mon + Thu at 08:00 UTC) to catch data integrity issues
+# before each GW cycle, plus on every push to main.
+
+on:
+  schedule:
+    - cron: "0 8 * * 1,4"
+  push:
+    branches: [main]
+    paths:
+      - "app/algorithms/**"
+      - "mcp_server.py"
+      - "scripts/accuracy_audit.py"
+  workflow_dispatch:
+    inputs:
+      team_id:
+        description: "FPL team ID for team-dependent tools"
+        default: "5293026"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Run accuracy audit
+        run: uv run python scripts/accuracy_audit.py --team-id ${{ github.event.inputs.team_id || '5293026' }}
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: accuracy-audit-report
+          path: |
+            data/accuracy_audit.json
+            data/accuracy_audit.csv

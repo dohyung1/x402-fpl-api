@@ -74,17 +74,27 @@ def _build_upcoming_fixtures(
     for gw in range(next_gw, next_gw + gameweeks_ahead):
         fixture_map = _build_fixture_map(fixtures, gw, teams_by_id=teams_by_id)
         gw_fixtures = fixture_map.get(team_id, [])
-        for fix in gw_fixtures:
-            opp = teams_by_id.get(fix["opponent"], {}).get("short_name", "?")
-            venue = "H" if fix["is_home"] else "A"
+        if not gw_fixtures:
             upcoming.append(
                 {
                     "gameweek": gw,
-                    "opponent": f"{opp}({venue})",
-                    "fdr": fix["fdr"],
-                    "is_home": fix["is_home"],
+                    "opponent": "BLANK",
+                    "fdr": None,
+                    "is_home": None,
                 }
             )
+        else:
+            for fix in gw_fixtures:
+                opp = teams_by_id.get(fix["opponent"], {}).get("short_name", "?")
+                venue = "H" if fix["is_home"] else "A"
+                upcoming.append(
+                    {
+                        "gameweek": gw,
+                        "opponent": f"{opp}({venue})",
+                        "fdr": fix["fdr"],
+                        "is_home": fix["is_home"],
+                    }
+                )
     return upcoming
 
 
@@ -115,7 +125,7 @@ def _build_verdict(profiles: list[dict]) -> str:
         reasons.append(f"strong recent form ({best['form']:.1f})")
 
     # Fixtures
-    upcoming = best.get("upcoming_fixtures", [])
+    upcoming = [f for f in best.get("upcoming_fixtures", []) if f["fdr"] is not None]
     if upcoming:
         avg_fdr = sum(f["fdr"] for f in upcoming) / len(upcoming)
         if avg_fdr <= 2.5:
@@ -260,7 +270,9 @@ async def compare_players(
             gameweeks_ahead,
             teams_by_id,
         )
-        avg_fdr = round(sum(f["fdr"] for f in upcoming) / len(upcoming), 2) if upcoming else None
+        real_fixtures = [f for f in upcoming if f["fdr"] is not None]
+        blank_gws = [f["gameweek"] for f in upcoming if f["fdr"] is None]
+        avg_fdr = round(sum(f["fdr"] for f in real_fixtures) / len(real_fixtures), 2) if real_fixtures else None
 
         profiles.append(
             {
@@ -294,6 +306,7 @@ async def compare_players(
                 "news": get_player_news(player),
                 "upcoming_fixtures": upcoming,
                 "avg_fdr_next_{}_gws".format(gameweeks_ahead): avg_fdr,
+                "blank_gameweeks": blank_gws,
             }
         )
 

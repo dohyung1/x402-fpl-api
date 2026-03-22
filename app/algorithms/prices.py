@@ -16,7 +16,7 @@ Players with high positive net transfers are "likely risers".
 Players with high negative net transfers are "likely fallers".
 """
 
-from app.algorithms import POSITION_MAP
+from app.algorithms import INJURY_STATUSES, POSITION_MAP
 from app.fpl_client import get_bootstrap
 
 # Rough FPL threshold: net ~1M transfers triggers a price change (±0.1m)
@@ -34,7 +34,7 @@ async def get_price_predictions(top_n: int = 20) -> dict:
     fallers = []
 
     for p in players:
-        if p.get("status") in {"i", "u"}:
+        if p.get("status") in INJURY_STATUSES:
             continue
 
         net = p.get("transfers_in_event", 0) - p.get("transfers_out_event", 0)

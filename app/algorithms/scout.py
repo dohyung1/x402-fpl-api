@@ -15,7 +15,7 @@ Surfaces hidden gems and risks that other tools miss.
 
 import asyncio
 
-from app.algorithms import POSITION_MAP
+from app.algorithms import INJURY_STATUSES, POSITION_MAP
 from app.algorithms.news import get_player_news, has_negative_news
 from app.fpl_client import (
     get_bootstrap,
@@ -196,7 +196,7 @@ async def get_squad_scout(team_id: int) -> dict:
     for p in bootstrap["elements"]:
         if p["id"] in squad_ids:
             continue
-        if p.get("status") in {"i", "u"}:
+        if p.get("status") in INJURY_STATUSES:
             continue
         penalties = p.get("penalties_order")
         corners = p.get("corners_and_indirect_freekicks_order")
