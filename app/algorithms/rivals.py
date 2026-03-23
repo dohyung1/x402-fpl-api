@@ -124,10 +124,12 @@ async def get_rival_analysis(league_id: int, team_id: int) -> dict:
             user_cap = players_by_id.get(user_captain_id, {})
             captain_info = {
                 "rival_captain": {
+                    "player_id": rival_cap.get("id"),
                     "name": rival_cap.get("web_name", "?"),
                     "team": teams_by_id.get(rival_cap.get("team"), {}).get("short_name", "?"),
                 },
                 "your_captain": {
+                    "player_id": user_cap.get("id"),
                     "name": user_cap.get("web_name", "?"),
                     "team": teams_by_id.get(user_cap.get("team"), {}).get("short_name", "?"),
                 },
@@ -228,6 +230,7 @@ def _format_player_list(
 
         result.append(
             {
+                "player_id": p["id"],
                 "name": p["web_name"],
                 "team": team_short,
                 "team_full_name": teams_by_id.get(p["team"], {}).get("name", "?"),
@@ -320,11 +323,13 @@ def _format_transfers(
             {
                 "gameweek": t["event"],
                 "in": {
+                    "player_id": player_in.get("id"),
                     "name": player_in.get("web_name", "?"),
                     "team": teams_by_id.get(player_in.get("team"), {}).get("short_name", "?"),
                     "cost": t["element_in_cost"] / 10,
                 },
                 "out": {
+                    "player_id": player_out.get("id"),
                     "name": player_out.get("web_name", "?"),
                     "team": teams_by_id.get(player_out.get("team"), {}).get("short_name", "?"),
                     "cost": t["element_out_cost"] / 10,
@@ -388,6 +393,7 @@ def _predict_next_move(
         if urgency > 3.0:
             transfer_out_candidates.append(
                 {
+                    "player_id": p.get("id"),
                     "name": p.get("web_name", "?"),
                     "team": teams_by_id.get(p.get("team"), {}).get("short_name", "?"),
                     "reason": _transfer_out_reason(p, fixture_map, teams_by_id),
@@ -456,6 +462,7 @@ def bootstrap_top_transfers_in(
 
         candidates.append(
             {
+                "player_id": pid,
                 "name": p.get("web_name", "?"),
                 "team": teams_by_id.get(p.get("team"), {}).get("short_name", "?"),
                 "form": form,

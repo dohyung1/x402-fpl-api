@@ -538,6 +538,7 @@ async def get_captain_picks(gameweek: int | None = None, top_n: int = 5) -> dict
         "gameweek": gameweek,
         "algorithm_version": "3.0",
         "most_captained": most_captained_info,
+        "num_picks": len(picks),
         "picks": picks,
     }
 

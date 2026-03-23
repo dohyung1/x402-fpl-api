@@ -153,5 +153,6 @@ async def get_fixture_outlook(
         "target_gameweeks": target_gws,
         "position_filter": position.upper() if position else None,
         "teams_by_difficulty": team_scores,
+        "num_players_to_target": len(players_to_target),
         "players_to_target": players_to_target,
     }

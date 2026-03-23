@@ -218,23 +218,27 @@ async def get_transfer_suggestions(
             }
         )
 
+    squad_overview = [
+        {
+            "name": s["name"],
+            "team": s["team"],
+            "position": s["position"],
+            "form": s["form"],
+            "value_score": s["value_score"],
+        }
+        for s in squad
+    ]
+
     return {
         "team_id": team_id,
         "gameweek": next_gw,
         "free_transfers": free_transfers,
         "bank_balance_m": bank_m,
         "budget_note": "Budget estimates use current player prices. FPL's selling price may differ if a player's value has risen since purchase — check the FPL app for your exact budget.",
+        "num_suggestions": len(suggestions),
         "transfer_suggestions": suggestions,
-        "squad_overview": [
-            {
-                "name": s["name"],
-                "team": s["team"],
-                "position": s["position"],
-                "form": s["form"],
-                "value_score": s["value_score"],
-            }
-            for s in squad
-        ],
+        "squad_size": len(squad_overview),
+        "squad_overview": squad_overview,
     }
 
 

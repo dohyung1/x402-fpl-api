@@ -321,7 +321,9 @@ async def get_squad_scout(team_id: int) -> dict:
         "team_id": team_id,
         "gameweek": current_gw,
         "next_gameweek": next_gw,
+        "squad_size": len(squad_report),
         "squad_report": squad_report,
+        "num_suspension_warnings": len(yellow_card_risks),
         "suspension_warnings": yellow_card_risks,
         "insights": {
             "blank_gw_warnings": blank_warnings,

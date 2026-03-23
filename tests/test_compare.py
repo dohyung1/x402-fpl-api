@@ -218,32 +218,44 @@ class TestFuzzyMatchPlayer:
     def test_exact_match(self):
         result = _fuzzy_match_player("Salah", MOCK_ELEMENTS)
         assert result is not None
-        assert result["id"] == 100
+        player, tier = result
+        assert player["id"] == 100
+        assert tier == "exact"
 
     def test_exact_match_case_insensitive(self):
         result = _fuzzy_match_player("salah", MOCK_ELEMENTS)
         assert result is not None
-        assert result["id"] == 100
+        player, tier = result
+        assert player["id"] == 100
+        assert tier == "exact"
 
     def test_partial_starts_with(self):
         result = _fuzzy_match_player("Sal", MOCK_ELEMENTS)
         assert result is not None
-        assert result["id"] == 100
+        player, tier = result
+        assert player["id"] == 100
+        assert tier == "starts_with"
 
     def test_partial_contains(self):
         result = _fuzzy_match_player("aal", MOCK_ELEMENTS)
         assert result is not None
-        assert result["id"] == 200  # Haaland
+        player, tier = result
+        assert player["id"] == 200  # Haaland
+        assert tier == "contains"
 
     def test_full_name_match(self):
         result = _fuzzy_match_player("Mohamed", MOCK_ELEMENTS)
         assert result is not None
-        assert result["id"] == 100
+        player, tier = result
+        assert player["id"] == 100
+        assert tier == "full_name"
 
     def test_full_name_match_case_insensitive(self):
         result = _fuzzy_match_player("erling", MOCK_ELEMENTS)
         assert result is not None
-        assert result["id"] == 200
+        player, tier = result
+        assert player["id"] == 200
+        assert tier == "full_name"
 
     def test_not_found_returns_none(self):
         result = _fuzzy_match_player("Nonexistent", MOCK_ELEMENTS)

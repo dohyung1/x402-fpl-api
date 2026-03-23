@@ -376,6 +376,9 @@ async def get_live_points(team_id: int) -> dict:
         # All days must have bonus_added=True for bonus to be fully confirmed
         bonus_confirmed = all(s.get("bonus_added", False) for s in status_entries)
 
+    # Validate squad composition
+    squad_valid = len(starter_data) == 11 and len(bench_data) == 4
+
     return {
         "team_id": team_id,
         "gameweek": current_gw,
@@ -388,7 +391,10 @@ async def get_live_points(team_id: int) -> dict:
             "Above average" if points_vs_avg > 5 else "Average" if points_vs_avg >= -5 else "Below average"
         ),
         "top_scorer": top_element_info,
+        "squad_valid": squad_valid,
+        "num_starters": len(starter_data),
         "starters": starter_data,
+        "num_bench": len(bench_data),
         "bench": bench_data,
         "auto_sub_scenarios": auto_sub_scenarios,
         "match_bps": match_bps,

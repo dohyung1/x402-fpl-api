@@ -56,7 +56,7 @@ def _calc_home_away_form(summary: dict) -> dict:
     }
 
 
-def _fuzzy_match_player(name: str, elements: list[dict]) -> dict | None:
+def _fuzzy_match_player(name: str, elements: list[dict]) -> tuple[dict, str] | None:
     """
     Match a player name against FPL web_name using case-insensitive partial matching.
 
@@ -66,7 +66,8 @@ def _fuzzy_match_player(name: str, elements: list[dict]) -> dict | None:
       3. Query appears anywhere in web_name
       4. Query appears anywhere in full name (first_name + second_name)
 
-    Returns the best match or None.
+    Returns a tuple of (player_dict, match_tier) or None.
+    match_tier is one of: "exact", "starts_with", "contains", "full_name".
     """
     query = name.strip().lower()
     if not query:
@@ -92,9 +93,10 @@ def _fuzzy_match_player(name: str, elements: list[dict]) -> dict | None:
 
     # Return the highest-priority match; within a tier, prefer the player
     # with the most total points (most likely the one the user means).
-    for group in (exact, starts_with, contains, full_name_contains):
+    tier_names = ("exact", "starts_with", "contains", "full_name")
+    for group, tier in zip((exact, starts_with, contains, full_name_contains), tier_names):
         if group:
-            return max(group, key=lambda p: p.get("total_points", 0))
+            return max(group, key=lambda p: p.get("total_points", 0)), tier
 
     return None
 
@@ -229,26 +231,29 @@ async def compare_players(
     matched = []
     errors = []
     for name in player_names:
-        player = _fuzzy_match_player(name, elements)
-        if player is None:
+        result = _fuzzy_match_player(name, elements)
+        if result is None:
             errors.append(f"No match found for '{name}'.")
         else:
-            matched.append((name, player))
+            player, match_tier = result
+            matched.append((name, player, match_tier))
 
     if errors:
         return {
             "error": "Could not match all player names.",
             "details": errors,
-            "matched": [{"query": q, "matched_name": p["web_name"]} for q, p in matched],
+            "matched": [{"query": q, "matched_name": p["web_name"]} for q, p, _t in matched],
         }
 
     # Fetch element-summaries in parallel for home/away form
-    summaries = await asyncio.gather(*(get_player_summary(player["id"]) for _, player in matched))
-    home_away_by_id = {player["id"]: _calc_home_away_form(summary) for (_, player), summary in zip(matched, summaries)}
+    summaries = await asyncio.gather(*(get_player_summary(player["id"]) for _, player, _ in matched))
+    home_away_by_id = {
+        player["id"]: _calc_home_away_form(summary) for (_, player, _), summary in zip(matched, summaries)
+    }
 
     # Build profiles
     profiles = []
-    for query, player in matched:
+    for query, player, match_tier in matched:
         team_id = player["team"]
         team = teams_by_id.get(team_id, {})
         player_fixtures = fixture_map.get(team_id)
@@ -320,6 +325,7 @@ async def compare_players(
         profiles.append(
             {
                 "query": query,
+                "match_confidence": match_tier,
                 "name": player["web_name"],
                 "full_name": f"{player.get('first_name', '')} {player.get('second_name', '')}",
                 "id": player["id"],

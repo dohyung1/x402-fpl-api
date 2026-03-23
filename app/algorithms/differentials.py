@@ -175,5 +175,6 @@ async def get_differentials(
         "gameweek": gameweek,
         "max_ownership_pct": max_ownership_pct,
         "algorithm_version": "1.1",
+        "num_differentials": len(results),
         "differentials": results,
     }
