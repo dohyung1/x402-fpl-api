@@ -341,6 +341,12 @@ async def _fpl_manager_hub_impl(team_id: int, gameweeks_ahead: int) -> dict:
     bank = manager_status["bank"]
     free_transfers = manager_status["free_transfers"]
 
+    # Get real squad value from history API (not summed now_cost which inflates)
+    season = history_data.get("current", [])
+    latest_gw_entry = season[-1] if season else {}
+    real_squad_value = latest_gw_entry.get("value", 0) / 10  # API stores in 0.1m units
+    real_bank = latest_gw_entry.get("bank", 0) / 10
+
     # Run all algorithm functions in parallel -- reuse existing code, no duplication
     captain_result, transfer_result, diff_result, fixture_result, price_result = await asyncio.gather(
         get_captain_picks(gameweek=next_gw),
@@ -364,7 +370,6 @@ async def _fpl_manager_hub_impl(team_id: int, gameweeks_ahead: int) -> dict:
 
     squad = []
     squad_ids = set()
-    total_value = 0.0
 
     for pick in picks_data.get("picks", []):
         element_id = pick["element"]  # Fix 8: use element ID directly
@@ -376,7 +381,6 @@ async def _fpl_manager_hub_impl(team_id: int, gameweeks_ahead: int) -> dict:
         player_fixtures = fixture_map.get(p["team"])
         captain_score = _score_player(p, player_fixtures)
         cost = p["now_cost"] / 10
-        total_value += cost
 
         # Build opponent string from fixtures (DGW-aware)
         if player_fixtures:
@@ -464,7 +468,9 @@ async def _fpl_manager_hub_impl(team_id: int, gameweeks_ahead: int) -> dict:
         "gameweek": current_gw,
         "prepping_for": f"GW{next_gw}",
         "manager_status": manager_status,
-        "total_squad_value": round(total_value + bank, 1),
+        "squad_value": real_squad_value,
+        "bank": real_bank,
+        "total_budget": round(real_squad_value + real_bank, 1),
         "season_summary": {
             "total_points": total_points,
             "gameweeks_played": len(season),
