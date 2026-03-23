@@ -48,7 +48,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Restore snapshot cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             data/snapshots
@@ -68,7 +68,7 @@ jobs:
         run: uv run python -m app.algorithms.weight_optimizer
 
       - name: Save snapshot cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         if: always()
         with:
           path: |
