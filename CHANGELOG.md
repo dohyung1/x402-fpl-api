@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.19.0] - 2026-03-23
+
+### Added
+- **BPS bonus tracker** in `live_points` tool — projected bonus points per player with BPS rankings, tie-handling per FPL rules, match-level BPS breakdowns, and "on track for X bonus" / "X BPS behind bonus" messaging
+- **MCPize marketplace deployment** — `mcpize.yaml` manifest for paid tier distribution
+- **Smithery registry config** — `smithery.yaml` for discovery on Smithery.ai
+- **Official MCP registry identifier** — `mcp-name` tag in README for registry.modelcontextprotocol.io
+- **Branding** — "Powered by FPL Intelligence" in MCP instructions and hub output
+- **Weekly downloads badge** on README
+
+### Fixed
+- README: removed stale `community_consensus` references, corrected tool count to 12
+
 ## [0.18.0] - 2026-03-22
 
 ### Added

@@ -9,6 +9,8 @@
 
 Turn Claude into your FPL analyst. Captain picks, transfer advice, rival scouting, chip timing, league predictions — powered by real-time FPL data.
 
+<!-- mcp-name: io.github.dohyung1/fpl-intelligence -->
+
 [![FPL Intelligence MCP server](https://glama.ai/mcp/servers/dohyung1/x402-fpl-api/badges/card.svg)](https://glama.ai/mcp/servers/dohyung1/x402-fpl-api)
 
 ## Quick Start
