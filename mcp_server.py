@@ -344,8 +344,10 @@ async def _fpl_manager_hub_impl(team_id: int, gameweeks_ahead: int) -> dict:
     # Get real squad value from history API (not summed now_cost which inflates)
     season = history_data.get("current", [])
     latest_gw_entry = season[-1] if season else {}
-    real_squad_value = latest_gw_entry.get("value", 0) / 10  # API stores in 0.1m units
+    # FPL API "value" = total team value (squad + bank), not squad alone
+    api_total_value = latest_gw_entry.get("value", 0) / 10
     real_bank = latest_gw_entry.get("bank", 0) / 10
+    real_squad_value = round(api_total_value - real_bank, 1)
 
     # Run all algorithm functions in parallel -- reuse existing code, no duplication
     captain_result, transfer_result, diff_result, fixture_result, price_result = await asyncio.gather(
