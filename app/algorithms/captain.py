@@ -41,7 +41,7 @@ Weights tuned against GW1-29 actuals via scripts/backtest.py.
 
 import logging
 
-from app.algorithms import INJURY_STATUSES, POSITION_MAP
+from app.algorithms import INJURY_STATUSES, POSITION_MAP, detect_streak
 from app.algorithms.news import format_news_for_reasoning, news_penalty_score
 from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek
 
@@ -427,7 +427,21 @@ async def get_captain_picks(gameweek: int | None = None, top_n: int = 5) -> dict
         scored.append((score, player, player_fixtures))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    top = scored[:top_n]
+
+    # Team diversity cap: max 2 players per team in the final picks.
+    # Without this, 3-4 picks can come from the same team (e.g. 3 Arsenal
+    # players) which isn't useful captain advice.
+    MAX_PER_TEAM = 2
+    top: list[tuple] = []
+    team_count: dict[int, int] = {}
+    for entry in scored:
+        tid = entry[1]["team"]
+        if team_count.get(tid, 0) >= MAX_PER_TEAM:
+            continue
+        top.append(entry)
+        team_count[tid] = team_count.get(tid, 0) + 1
+        if len(top) >= top_n:
+            break
 
     picks = []
     for score, player, player_fixtures in top:
@@ -496,6 +510,7 @@ async def get_captain_picks(gameweek: int | None = None, top_n: int = 5) -> dict
                     "starts": player.get("starts", 0),
                     "chance_of_playing": player.get("chance_of_playing_next_round"),
                 },
+                "streak": detect_streak(player),
             }
         )
 

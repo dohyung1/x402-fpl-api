@@ -13,7 +13,7 @@ differential_score =
 DGW support: fixture difficulty is the average across all fixtures in the GW.
 """
 
-from app.algorithms import INJURY_STATUSES, POSITION_MAP
+from app.algorithms import INJURY_STATUSES, POSITION_MAP, detect_streak
 from app.algorithms.captain import _build_fixture_map
 from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek
 
@@ -167,6 +167,7 @@ async def get_differentials(
                     "total_points": player.get("total_points", 0),
                 },
                 "why": _build_why(player, player_fixtures),
+                "streak": detect_streak(player),
             }
         )
 

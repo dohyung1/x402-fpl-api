@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.20.0] - 2026-03-23
+
+### Added
+- **Hot streak / cold streak detection** — captain picks and differentials now tag players as "hot", "cold", or "neutral" based on form vs season PPG
+- **Home/away form splits** — player comparison shows avg points from last 5 home and away games with insight text
+- **Captain team diversity cap** — max 2 players per team in captain picks to avoid over-concentration
+
 ## [0.19.0] - 2026-03-23
 
 ### Added

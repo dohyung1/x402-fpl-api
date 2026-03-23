@@ -16,7 +16,44 @@ from app.algorithms.captain import (
     _score_player,
 )
 from app.algorithms.news import get_player_news
-from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek
+from app.fpl_client import get_bootstrap, get_fixtures, get_next_gameweek, get_player_summary
+
+
+def _calc_home_away_form(summary: dict) -> dict:
+    """
+    Calculate average points from last 5 home and last 5 away games.
+
+    Args:
+        summary: Response from /element-summary/{player_id}/ endpoint.
+
+    Returns:
+        Dict with home_form, away_form, and home_away_insight text.
+    """
+    history = summary.get("history", [])
+
+    home_games = [m for m in history if m.get("was_home") and m.get("minutes", 0) > 0]
+    away_games = [m for m in history if not m.get("was_home") and m.get("minutes", 0) > 0]
+
+    # Take last 5 of each
+    last_home = home_games[-5:]
+    last_away = away_games[-5:]
+
+    home_avg = round(sum(m["total_points"] for m in last_home) / len(last_home), 1) if last_home else 0.0
+    away_avg = round(sum(m["total_points"] for m in last_away) / len(last_away), 1) if last_away else 0.0
+
+    diff = home_avg - away_avg
+    if abs(diff) < 1.0:
+        insight = f"Similar home and away form (H: {home_avg} / A: {away_avg})"
+    elif diff > 0:
+        insight = f"Stronger at home (avg {home_avg} vs {away_avg} away)"
+    else:
+        insight = f"Stronger away (avg {away_avg} vs {home_avg} at home)"
+
+    return {
+        "home_form": home_avg,
+        "away_form": away_avg,
+        "home_away_insight": insight,
+    }
 
 
 def _fuzzy_match_player(name: str, elements: list[dict]) -> dict | None:
@@ -205,6 +242,15 @@ async def compare_players(
             "matched": [{"query": q, "matched_name": p["web_name"]} for q, p in matched],
         }
 
+    # Fetch element-summaries in parallel for home/away form
+    summaries = await asyncio.gather(
+        *(get_player_summary(player["id"]) for _, player in matched)
+    )
+    home_away_by_id = {
+        player["id"]: _calc_home_away_form(summary)
+        for (_, player), summary in zip(matched, summaries)
+    }
+
     # Build profiles
     profiles = []
     for query, player in matched:
@@ -274,6 +320,8 @@ async def compare_players(
         blank_gws = [f["gameweek"] for f in upcoming if f["fdr"] is None]
         avg_fdr = round(sum(f["fdr"] for f in real_fixtures) / len(real_fixtures), 2) if real_fixtures else None
 
+        ha = home_away_by_id[player["id"]]
+
         profiles.append(
             {
                 "query": query,
@@ -286,6 +334,9 @@ async def compare_players(
                 "cost": cost,
                 "ownership_pct": ownership,
                 "form": form,
+                "home_form": ha["home_form"],
+                "away_form": ha["away_form"],
+                "home_away_insight": ha["home_away_insight"],
                 "points_per_game": ppg,
                 "ep_next": ep_next,
                 "total_points": total_points,
