@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.22.0] - 2026-03-23
+
+### Fixed
+- **BPS double-counting bug** — bonus points were added on top of total_points that already included confirmed bonus (e.g., Wilson showed 11 instead of 9)
+- **Squad value inflation** — was summing current market prices (~104.9m) instead of using FPL API's real selling value (~99.3m)
+- **Anti-hallucination guardrails** — explicit count fields, squad validation, player IDs, match confidence tiers, and enhanced MCP instructions across all tools
+
+### Added
+- **Comprehensive backtest** (`scripts/backtest_full.py`) — tests differentials, transfers, BPS accuracy, and blank-GW detection across all finished GWs
+- `confirmed_bonus` and `bonus_status` fields in live points output
+- `squad_valid`, `squad_value`, `bank`, `total_budget` fields in hub output
+
 ## [0.21.0] - 2026-03-23
 
 ### Added
