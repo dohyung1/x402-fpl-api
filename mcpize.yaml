@@ -1,0 +1,10 @@
+# MCPize manifest - https://mcpize.com
+version: 1
+runtime: python
+build:
+  install: pip install -e .
+startCommand:
+  type: stdio
+  command: python
+  args:
+    - mcp_server.py
