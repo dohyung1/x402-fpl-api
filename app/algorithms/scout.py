@@ -25,6 +25,75 @@ from app.fpl_client import (
     get_team_picks,
 )
 
+# Premier League yellow card suspension thresholds.
+# Format: (card_count, before_gw, ban_length)
+#   - 5 yellows before GW19 = 1-match ban
+#   - 10 yellows before GW32 = 2-match ban
+#   - 15 yellows (any time) = 3-match ban
+_YELLOW_THRESHOLDS = [
+    (5, 19, 1),
+    (10, 32, 2),
+    (15, None, 3),
+]
+
+
+def _get_suspension_risk(yellow_cards: int, red_cards: int, next_gw: int) -> dict:
+    """Calculate suspension risk for a player based on card accumulation."""
+    # Find the next applicable threshold
+    next_threshold = None
+    ban_length = None
+    for threshold, before_gw, ban_len in _YELLOW_THRESHOLDS:
+        if yellow_cards < threshold and (before_gw is None or next_gw < before_gw):
+            next_threshold = threshold
+            ban_length = ban_len
+            break
+
+    if next_threshold is None:
+        return {
+            "yellow_cards": yellow_cards,
+            "red_cards": red_cards,
+            "next_threshold": None,
+            "cards_until_ban": None,
+            "risk_level": "low",
+            "note": None,
+        }
+
+    cards_until = next_threshold - yellow_cards
+    if cards_until <= 1:
+        risk_level = "high"
+    elif cards_until <= 2:
+        risk_level = "medium"
+    else:
+        risk_level = "low"
+
+    note_parts = []
+    if cards_until <= 2:
+        note_parts.append(
+            f"{cards_until} yellow card{'s' if cards_until != 1 else ''} away from {ban_length}-match ban"
+        )
+    if red_cards > 0:
+        note_parts.append(f"{red_cards} red card{'s' if red_cards != 1 else ''} this season")
+
+    return {
+        "yellow_cards": yellow_cards,
+        "red_cards": red_cards,
+        "next_threshold": next_threshold,
+        "cards_until_ban": cards_until,
+        "risk_level": risk_level,
+        "note": ". ".join(note_parts) if note_parts else None,
+    }
+
+
+def _ordinal(n: int) -> str:
+    """Return ordinal string for set piece order (1 -> '1st', 2 -> '2nd', etc.)."""
+    if n == 1:
+        return "1st"
+    if n == 2:
+        return "2nd"
+    if n == 3:
+        return "3rd"
+    return f"{n}th"
+
 
 async def get_squad_scout(team_id: int) -> dict:
     """
@@ -98,37 +167,59 @@ async def get_squad_scout(team_id: int) -> dict:
                             }
                         )
 
-        # Set piece duties
+        # Set piece duties — per-player detail
         corners_order = p.get("corners_and_indirect_freekicks_order")
         fk_order = p.get("direct_freekicks_order")
         penalties_order = p.get("penalties_order")
-        if corners_order == 1 or fk_order == 1 or penalties_order == 1:
-            duties = []
-            if penalties_order == 1:
-                duties.append("penalties")
-            if corners_order == 1:
-                duties.append("corners")
-            if fk_order == 1:
-                duties.append("direct free kicks")
+        is_set_piece_taker = any(v is not None for v in (corners_order, fk_order, penalties_order))
+
+        # Build human-readable summary parts
+        sp_parts = []
+        if corners_order is not None:
+            sp_parts.append(f"Corners ({_ordinal(corners_order)})")
+        if fk_order is not None:
+            sp_parts.append(f"Direct FKs ({_ordinal(fk_order)})")
+        if penalties_order is not None:
+            sp_parts.append(f"Penalties ({_ordinal(penalties_order)})")
+
+        player_info["set_pieces"] = {
+            "corners": corners_order,
+            "direct_free_kicks": fk_order,
+            "penalties": penalties_order,
+            "is_set_piece_taker": is_set_piece_taker,
+            "summary": ", ".join(sp_parts) if sp_parts else None,
+        }
+
+        if is_set_piece_taker:
             set_piece_takers.append(
                 {
                     "name": p["web_name"],
                     "team": team.get("short_name", "?"),
-                    "duties": duties,
-                    "in_squad": True,
+                    "duties": sp_parts,
+                    "corners": corners_order,
+                    "direct_free_kicks": fk_order,
+                    "penalties": penalties_order,
                     "starter": is_starter,
                 }
             )
 
-        # Yellow card suspension risk (4 yellows = 1 match ban in PL)
-        yellows = p.get("yellow_cards", 0)
-        if yellows >= 4:
+        # Suspension risk from card accumulation
+        suspension = _get_suspension_risk(
+            yellow_cards=p.get("yellow_cards", 0),
+            red_cards=p.get("red_cards", 0),
+            next_gw=next_gw,
+        )
+        player_info["suspension_risk"] = suspension
+        if suspension["risk_level"] == "high":
             yellow_card_risks.append(
                 {
                     "name": p["web_name"],
                     "team": team.get("short_name", "?"),
-                    "yellow_cards": yellows,
-                    "risk": "1-match ban imminent" if yellows == 4 else f"{yellows} yellows",
+                    "yellow_cards": suspension["yellow_cards"],
+                    "red_cards": suspension["red_cards"],
+                    "next_threshold": suspension["next_threshold"],
+                    "cards_until_ban": suspension["cards_until_ban"],
+                    "note": suspension["note"],
                 }
             )
 
@@ -231,6 +322,7 @@ async def get_squad_scout(team_id: int) -> dict:
         "gameweek": current_gw,
         "next_gameweek": next_gw,
         "squad_report": squad_report,
+        "suspension_warnings": yellow_card_risks,
         "insights": {
             "blank_gw_warnings": blank_warnings,
             "ep_captain_suggestion": ep_captain_suggestion,
@@ -265,7 +357,7 @@ def _build_summary(blanks, ep_captain, set_pieces, yellows, ep_rankings) -> str:
         )
 
     if yellows:
-        names = ", ".join(f"{y['name']} ({y['yellow_cards']})" for y in yellows)
+        names = ", ".join(f"{y['name']} ({y['yellow_cards']} YC, {y['cards_until_ban']} from ban)" for y in yellows)
         parts.append(f"Suspension risk: {names}")
 
     if not parts:

@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.21.0] - 2026-03-23
+
+### Added
+- **Set piece intelligence** in squad scout — corners, free kicks, and penalty taker duties with ordinal rankings (1st/2nd/3rd choice) per player
+- **Suspension risk tracker** in squad scout — yellow card accumulation tracking against PL thresholds (5/10/15), risk levels (high/medium/low), and ban warnings
+- **GW evaluation in CI** — post-GW accuracy evaluation and audit now run automatically in the snapshot workflow
+- 14 new tests for suspension risk logic
+
 ## [0.20.0] - 2026-03-23
 
 ### Added

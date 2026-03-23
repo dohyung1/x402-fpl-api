@@ -54,6 +54,10 @@ jobs:
             data/snapshots
             data/backtest_cache
             data/optimized_weights.json
+            data/evaluation.csv
+            data/evaluation.json
+            data/accuracy_audit.json
+            data/accuracy_audit.csv
           key: gw-snapshots-${{ github.run_number }}
           restore-keys: |
             gw-snapshots-
@@ -63,6 +67,12 @@ jobs:
 
       - name: Cache live data for optimizer
         run: uv run python scripts/backtest.py --gameweeks 1-38 2>/dev/null || true
+
+      - name: Evaluate GW accuracy
+        run: uv run python scripts/evaluate_gw.py --all 2>/dev/null || true
+
+      - name: Run accuracy audit
+        run: uv run python scripts/accuracy_audit.py --json-only 2>/dev/null || true
 
       - name: Run weight optimizer
         run: uv run python -m app.algorithms.weight_optimizer
@@ -75,4 +85,8 @@ jobs:
             data/snapshots
             data/backtest_cache
             data/optimized_weights.json
+            data/evaluation.csv
+            data/evaluation.json
+            data/accuracy_audit.json
+            data/accuracy_audit.csv
           key: gw-snapshots-${{ github.run_number }}
