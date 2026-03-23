@@ -5,6 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io)
+[![Downloads](https://img.shields.io/pypi/dw/fpl-intelligence)](https://pypistats.org/packages/fpl-intelligence)
 
 Turn Claude into your FPL analyst. Captain picks, transfer advice, rival scouting, chip timing, league predictions — powered by real-time FPL data.
 
@@ -50,7 +51,7 @@ Your league ID is in the mini-league URL:
 https://fantasy.premierleague.com/leagues/YOUR_LEAGUE_ID/standings/c
 ```
 
-## 14 Tools
+## 12 Tools
 
 | Tool | What it does |
 |---|---|
@@ -67,7 +68,6 @@ https://fantasy.premierleague.com/leagues/YOUR_LEAGUE_ID/standings/c
 | `rival_tracker` | Spy on mini-league rivals — differentials, weaknesses, predicted moves |
 | `league_analyzer` | Win probabilities for your league — who's the favourite and why |
 | `squad_scout` | Deep scout using FPL's hidden data — ep_next, set pieces, suspension risks |
-| `community_consensus` | What are FPL YouTubers saying? Captain picks, transfers, and chip advice from top creators |
 
 ## Example Prompts
 
@@ -92,9 +92,7 @@ https://fantasy.premierleague.com/leagues/YOUR_LEAGUE_ID/standings/c
 
 "Which players are about to drop in price tonight? I need to sell before the deadline"
 
-"What are FPL YouTubers saying about this gameweek? Who are they captaining?"
-
-"Get the community consensus on transfers — who are the experts bringing in?"
+"Scout my squad — who's nailed, who's at risk of rotation, any suspension danger?"
 ```
 
 ## How It Works
