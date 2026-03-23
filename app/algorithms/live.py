@@ -281,7 +281,21 @@ async def get_live_points(team_id: int) -> dict:
         pts = live_points_for(element_id)
         multiplier = pick.get("multiplier", 1)
         bonus_info = all_player_bonus.get(element_id)
-        projected_bonus = bonus_info["projected_bonus"] if bonus_info else 0
+
+        # Check if bonus is already included in total_points.
+        # FPL API: stats.bonus > 0 means bonus is confirmed and already in total_points.
+        # In that case, projected_bonus should be 0 to avoid double-counting.
+        el = live_elements.get(element_id, {})
+        confirmed_bonus = el.get("stats", {}).get("bonus", 0)
+        if confirmed_bonus > 0:
+            # Bonus already in total_points — don't add projected on top
+            projected_bonus = 0
+            bonus_status = "confirmed"
+        else:
+            # Bonus not yet confirmed — use BPS projection
+            projected_bonus = bonus_info["projected_bonus"] if bonus_info else 0
+            bonus_status = "projected"
+
         return {
             "element_id": element_id,
             "name": p.get("web_name", "Unknown"),
@@ -293,13 +307,19 @@ async def get_live_points(team_id: int) -> dict:
             "live_points": pts,
             "contributed_points": pts * multiplier,
             "projected_bonus": projected_bonus,
+            "confirmed_bonus": confirmed_bonus,
+            "bonus_status": bonus_status,
             "bonus_projection": {
                 "bps": bonus_info["bps"] if bonus_info else 0,
                 "projected_bonus": projected_bonus,
                 "bps_rank": bonus_info.get("bps_rank") if bonus_info else None,
                 "bps_behind_bonus": bonus_info.get("bps_behind_bonus", 0) if bonus_info else 0,
                 "match": bonus_info.get("match", "") if bonus_info else "",
-                "narrative": _bonus_narrative(bonus_info),
+                "narrative": (
+                    f"Bonus confirmed: {confirmed_bonus} pts"
+                    if bonus_status == "confirmed"
+                    else _bonus_narrative(bonus_info)
+                ),
             },
             "minutes_played": minutes_for(element_id),
             "played": minutes_for(element_id) > 0,
