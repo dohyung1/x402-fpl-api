@@ -576,7 +576,17 @@ class TestGetLivePoints:
         bootstrap = {
             "elements": [_make_player(id=10, web_name="Salah", team=14)],
             "teams": [{"id": 14, "short_name": "LIV", "name": "Liverpool"}],
-            "events": [{"id": 30, "is_current": True, "is_next": False, "finished": False, "average_entry_score": 45, "highest_score": 80, "top_element": 10}],
+            "events": [
+                {
+                    "id": 30,
+                    "is_current": True,
+                    "is_next": False,
+                    "finished": False,
+                    "average_entry_score": 45,
+                    "highest_score": 80,
+                    "top_element": 10,
+                }
+            ],
         }
         picks_data = {
             "picks": [{"element": 10, "position": 1, "multiplier": 1, "is_captain": False, "is_vice_captain": False}],

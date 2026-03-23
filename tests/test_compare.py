@@ -135,6 +135,7 @@ MOCK_BOOTSTRAP = {
     "teams": MOCK_TEAMS,
 }
 
+
 def _make_mock_summary(player_id: int) -> dict:
     """Generate a mock element-summary with home/away history for a player."""
     history = []

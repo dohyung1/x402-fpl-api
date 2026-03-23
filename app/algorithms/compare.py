@@ -243,13 +243,8 @@ async def compare_players(
         }
 
     # Fetch element-summaries in parallel for home/away form
-    summaries = await asyncio.gather(
-        *(get_player_summary(player["id"]) for _, player in matched)
-    )
-    home_away_by_id = {
-        player["id"]: _calc_home_away_form(summary)
-        for (_, player), summary in zip(matched, summaries)
-    }
+    summaries = await asyncio.gather(*(get_player_summary(player["id"]) for _, player in matched))
+    home_away_by_id = {player["id"]: _calc_home_away_form(summary) for (_, player), summary in zip(matched, summaries)}
 
     # Build profiles
     profiles = []

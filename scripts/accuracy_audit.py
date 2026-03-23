@@ -68,6 +68,7 @@ class AuditCheck:
 # Reference data helpers
 # ---------------------------------------------------------------------------
 
+
 def build_blanking_teams(fixtures: list, gameweek: int) -> set[int]:
     """Return set of team IDs that have NO fixture in the given GW."""
     teams_with_fixture = set()
@@ -87,14 +88,19 @@ def verify_team(player_id, claimed_team, players_by_id, teams_by_id, tool_name) 
     """Verify a player's team assignment matches bootstrap data."""
     ref = players_by_id.get(player_id)
     if ref is None:
-        return AuditCheck(tool_name, "ghost_player", False, "error",
-                          f"Player ID {player_id} not found in bootstrap data")
+        return AuditCheck(
+            tool_name, "ghost_player", False, "error", f"Player ID {player_id} not found in bootstrap data"
+        )
     actual_team = teams_by_id.get(ref["team"], {}).get("short_name", "?")
     if claimed_team != actual_team:
         name = ref.get("web_name", "?")
-        return AuditCheck(tool_name, "team_assignment", False, "error",
-                          f"{name} (ID {player_id}): output says '{claimed_team}', "
-                          f"FPL API says '{actual_team}'")
+        return AuditCheck(
+            tool_name,
+            "team_assignment",
+            False,
+            "error",
+            f"{name} (ID {player_id}): output says '{claimed_team}', FPL API says '{actual_team}'",
+        )
     return None
 
 
@@ -106,8 +112,13 @@ def verify_position(player_id, claimed_pos, players_by_id, tool_name) -> AuditCh
     actual_pos = POSITION_MAP.get(ref["element_type"], "?")
     if claimed_pos != actual_pos:
         name = ref.get("web_name", "?")
-        return AuditCheck(tool_name, "position_mismatch", False, "error",
-                          f"{name}: output says '{claimed_pos}', FPL API says '{actual_pos}'")
+        return AuditCheck(
+            tool_name,
+            "position_mismatch",
+            False,
+            "error",
+            f"{name}: output says '{claimed_pos}', FPL API says '{actual_pos}'",
+        )
     return None
 
 
@@ -115,8 +126,8 @@ def verify_position(player_id, claimed_pos, players_by_id, tool_name) -> AuditCh
 # Per-tool audit functions
 # ---------------------------------------------------------------------------
 
-async def audit_captain(bootstrap, fixtures, players_by_id, teams_by_id,
-                        blanking_teams, next_gw) -> list[AuditCheck]:
+
+async def audit_captain(bootstrap, fixtures, players_by_id, teams_by_id, blanking_teams, next_gw) -> list[AuditCheck]:
     from app.algorithms.captain import get_captain_picks
 
     checks = []
@@ -128,12 +139,10 @@ async def audit_captain(bootstrap, fixtures, players_by_id, teams_by_id,
 
     picks = result.get("picks", [])
     if not picks:
-        checks.append(AuditCheck("captain", "empty_output", False, "warning",
-                                 "Captain picks returned 0 results"))
+        checks.append(AuditCheck("captain", "empty_output", False, "warning", "Captain picks returned 0 results"))
         return checks
 
-    checks.append(AuditCheck("captain", "returns_results", True, "info",
-                             f"{len(picks)} picks returned"))
+    checks.append(AuditCheck("captain", "returns_results", True, "info", f"{len(picks)} picks returned"))
 
     seen_ids = set()
     team_counts: dict[str, int] = {}
@@ -145,14 +154,20 @@ async def audit_captain(bootstrap, fixtures, players_by_id, teams_by_id,
 
         # Ghost player
         if pid not in players_by_id:
-            checks.append(AuditCheck("captain", "ghost_player", False, "error",
-                                     f"Player ID {pid} ({player.get('name')}) not in FPL data"))
+            checks.append(
+                AuditCheck(
+                    "captain", "ghost_player", False, "error", f"Player ID {pid} ({player.get('name')}) not in FPL data"
+                )
+            )
             continue
 
         # Duplicate
         if pid in seen_ids:
-            checks.append(AuditCheck("captain", "duplicate_player", False, "error",
-                                     f"{player.get('name')} appears multiple times"))
+            checks.append(
+                AuditCheck(
+                    "captain", "duplicate_player", False, "error", f"{player.get('name')} appears multiple times"
+                )
+            )
         seen_ids.add(pid)
 
         # Team assignment
@@ -168,23 +183,38 @@ async def audit_captain(bootstrap, fixtures, players_by_id, teams_by_id,
         # Blank GW
         ref = players_by_id[pid]
         if ref["team"] in blanking_teams:
-            checks.append(AuditCheck("captain", "blank_gw_leak", False, "error",
-                                     f"{player.get('name')} has no fixture in GW{next_gw} "
-                                     f"but appears in captain picks"))
+            checks.append(
+                AuditCheck(
+                    "captain",
+                    "blank_gw_leak",
+                    False,
+                    "error",
+                    f"{player.get('name')} has no fixture in GW{next_gw} but appears in captain picks",
+                )
+            )
 
         # Status check
         status = ref.get("status", "a")
         if status in INJURY_STATUSES:
             cop = ref.get("chance_of_playing_next_round")
-            checks.append(AuditCheck("captain", "injured_player_recommended", False, "warning",
-                                     f"{player.get('name')} has status '{status}' "
-                                     f"(chance={cop}%) but is recommended"))
+            checks.append(
+                AuditCheck(
+                    "captain",
+                    "injured_player_recommended",
+                    False,
+                    "warning",
+                    f"{player.get('name')} has status '{status}' (chance={cop}%) but is recommended",
+                )
+            )
 
         # Score validity
         score = pick.get("score", 0)
         if not isinstance(score, (int, float)) or score != score:  # NaN check
-            checks.append(AuditCheck("captain", "invalid_score", False, "error",
-                                     f"{player.get('name')} has invalid score: {score}"))
+            checks.append(
+                AuditCheck(
+                    "captain", "invalid_score", False, "error", f"{player.get('name')} has invalid score: {score}"
+                )
+            )
 
         # Team diversity tracking
         team_counts[team] = team_counts.get(team, 0) + 1
@@ -192,19 +222,29 @@ async def audit_captain(bootstrap, fixtures, players_by_id, teams_by_id,
     # Team diversity check
     for t, count in team_counts.items():
         if count >= 4:
-            checks.append(AuditCheck("captain", "team_diversity", False, "warning",
-                                     f"{count} of {len(picks)} captain picks are from {t}"))
+            checks.append(
+                AuditCheck(
+                    "captain", "team_diversity", False, "warning", f"{count} of {len(picks)} captain picks are from {t}"
+                )
+            )
 
     if not any(not c.passed for c in checks):
-        checks.append(AuditCheck("captain", "all_checks", True, "info",
-                                 f"All checks passed for {len(picks)} picks "
-                                 f"(team/pos/status/blank/score validated)"))
+        checks.append(
+            AuditCheck(
+                "captain",
+                "all_checks",
+                True,
+                "info",
+                f"All checks passed for {len(picks)} picks (team/pos/status/blank/score validated)",
+            )
+        )
 
     return checks
 
 
-async def audit_differentials(bootstrap, fixtures, players_by_id, teams_by_id,
-                              blanking_teams, next_gw) -> list[AuditCheck]:
+async def audit_differentials(
+    bootstrap, fixtures, players_by_id, teams_by_id, blanking_teams, next_gw
+) -> list[AuditCheck]:
     from app.algorithms.differentials import get_differentials
 
     checks = []
@@ -217,12 +257,10 @@ async def audit_differentials(bootstrap, fixtures, players_by_id, teams_by_id,
 
     picks = result.get("differentials", [])
     if not picks:
-        checks.append(AuditCheck("differentials", "empty_output", False, "warning",
-                                 "Differentials returned 0 results"))
+        checks.append(AuditCheck("differentials", "empty_output", False, "warning", "Differentials returned 0 results"))
         return checks
 
-    checks.append(AuditCheck("differentials", "returns_results", True, "info",
-                             f"{len(picks)} differentials returned"))
+    checks.append(AuditCheck("differentials", "returns_results", True, "info", f"{len(picks)} differentials returned"))
 
     for pick in picks:
         player = pick.get("player", {})
@@ -231,8 +269,9 @@ async def audit_differentials(bootstrap, fixtures, players_by_id, teams_by_id,
         pos = player.get("position", "?")
 
         if pid not in players_by_id:
-            checks.append(AuditCheck("differentials", "ghost_player", False, "error",
-                                     f"Player ID {pid} not in FPL data"))
+            checks.append(
+                AuditCheck("differentials", "ghost_player", False, "error", f"Player ID {pid} not in FPL data")
+            )
             continue
 
         ref = players_by_id[pid]
@@ -250,31 +289,48 @@ async def audit_differentials(bootstrap, fixtures, players_by_id, teams_by_id,
         # Ownership threshold
         actual_own = float(ref.get("selected_by_percent") or 0)
         if actual_own > max_own + 0.5:  # small tolerance for API lag
-            checks.append(AuditCheck("differentials", "ownership_exceeded", False, "error",
-                                     f"{player.get('name')} has {actual_own}% ownership "
-                                     f"(threshold: {max_own}%)"))
+            checks.append(
+                AuditCheck(
+                    "differentials",
+                    "ownership_exceeded",
+                    False,
+                    "error",
+                    f"{player.get('name')} has {actual_own}% ownership (threshold: {max_own}%)",
+                )
+            )
 
         # Blank GW
         if ref["team"] in blanking_teams:
-            checks.append(AuditCheck("differentials", "blank_gw_leak", False, "error",
-                                     f"{player.get('name')} has no fixture in GW{next_gw}"))
+            checks.append(
+                AuditCheck(
+                    "differentials",
+                    "blank_gw_leak",
+                    False,
+                    "error",
+                    f"{player.get('name')} has no fixture in GW{next_gw}",
+                )
+            )
 
         # Status
         status = ref.get("status", "a")
         if status in INJURY_STATUSES:
-            checks.append(AuditCheck("differentials", "injured_recommended", False, "error",
-                                     f"{player.get('name')} has status '{status}' "
-                                     f"but is recommended as differential"))
+            checks.append(
+                AuditCheck(
+                    "differentials",
+                    "injured_recommended",
+                    False,
+                    "error",
+                    f"{player.get('name')} has status '{status}' but is recommended as differential",
+                )
+            )
 
     if not any(not c.passed for c in checks):
-        checks.append(AuditCheck("differentials", "all_checks", True, "info",
-                                 "All differential checks passed"))
+        checks.append(AuditCheck("differentials", "all_checks", True, "info", "All differential checks passed"))
 
     return checks
 
 
-async def audit_fixtures(bootstrap, fixtures, players_by_id, teams_by_id,
-                         blanking_teams, next_gw) -> list[AuditCheck]:
+async def audit_fixtures(bootstrap, fixtures, players_by_id, teams_by_id, blanking_teams, next_gw) -> list[AuditCheck]:
     from app.algorithms.fixtures import get_fixture_outlook
 
     checks = []
@@ -289,16 +345,16 @@ async def audit_fixtures(bootstrap, fixtures, players_by_id, teams_by_id,
 
     # All 20 teams present
     if len(teams) != 20:
-        checks.append(AuditCheck("fixtures", "team_count", False, "error",
-                                 f"Expected 20 teams, got {len(teams)}"))
+        checks.append(AuditCheck("fixtures", "team_count", False, "error", f"Expected 20 teams, got {len(teams)}"))
     else:
         checks.append(AuditCheck("fixtures", "team_count", True, "info", "All 20 teams present"))
 
     # Team names valid
     for t in teams:
         if t.get("team") not in valid_team_names:
-            checks.append(AuditCheck("fixtures", "invalid_team_name", False, "error",
-                                     f"Unknown team short name: {t.get('team')}"))
+            checks.append(
+                AuditCheck("fixtures", "invalid_team_name", False, "error", f"Unknown team short name: {t.get('team')}")
+            )
 
     # Players to target
     players_to_target = result.get("players_to_target", [])
@@ -307,38 +363,46 @@ async def audit_fixtures(bootstrap, fixtures, players_by_id, teams_by_id,
         team = p.get("team", "?")
 
         if team not in valid_team_names:
-            checks.append(AuditCheck("fixtures", "invalid_player_team", False, "error",
-                                     f"{name} has invalid team: {team}"))
+            checks.append(
+                AuditCheck("fixtures", "invalid_player_team", False, "error", f"{name} has invalid team: {team}")
+            )
 
         pos = p.get("position", "?")
         if pos not in {"GKP", "DEF", "MID", "FWD"}:
-            checks.append(AuditCheck("fixtures", "invalid_position", False, "error",
-                                     f"{name} has invalid position: {pos}"))
+            checks.append(
+                AuditCheck("fixtures", "invalid_position", False, "error", f"{name} has invalid position: {pos}")
+            )
 
         # Check player's team has fixture in next GW
         # Find this player in bootstrap
-        matches = [pl for pl in bootstrap["elements"] if pl["web_name"] == name and
-                   teams_by_id.get(pl["team"], {}).get("short_name") == team]
+        matches = [
+            pl
+            for pl in bootstrap["elements"]
+            if pl["web_name"] == name and teams_by_id.get(pl["team"], {}).get("short_name") == team
+        ]
         if matches and matches[0]["team"] in blanking_teams:
-            checks.append(AuditCheck("fixtures", "blank_gw_leak", False, "error",
-                                     f"{name} ({team}) has no fixture in GW{next_gw} "
-                                     f"but appears in players_to_target"))
+            checks.append(
+                AuditCheck(
+                    "fixtures",
+                    "blank_gw_leak",
+                    False,
+                    "error",
+                    f"{name} ({team}) has no fixture in GW{next_gw} but appears in players_to_target",
+                )
+            )
 
     if not any(not c.passed for c in checks):
-        checks.append(AuditCheck("fixtures", "all_checks", True, "info",
-                                 "All fixture checks passed"))
+        checks.append(AuditCheck("fixtures", "all_checks", True, "info", "All fixture checks passed"))
 
     return checks
 
 
-async def audit_compare(bootstrap, fixtures, players_by_id, teams_by_id,
-                        blanking_teams, next_gw) -> list[AuditCheck]:
+async def audit_compare(bootstrap, fixtures, players_by_id, teams_by_id, blanking_teams, next_gw) -> list[AuditCheck]:
     from app.algorithms.compare import compare_players
 
     checks = []
     # Use well-known players — pick top 2 by total_points
-    top_players = sorted(bootstrap["elements"],
-                         key=lambda p: p.get("total_points", 0), reverse=True)[:2]
+    top_players = sorted(bootstrap["elements"], key=lambda p: p.get("total_points", 0), reverse=True)[:2]
     names = [p["web_name"] for p in top_players]
 
     try:
@@ -348,24 +412,24 @@ async def audit_compare(bootstrap, fixtures, players_by_id, teams_by_id,
         return checks
 
     if "error" in result:
-        checks.append(AuditCheck("compare", "match_error", False, "error",
-                                 f"Compare failed: {result['error']}"))
+        checks.append(AuditCheck("compare", "match_error", False, "error", f"Compare failed: {result['error']}"))
         return checks
 
     profiles = result.get("players", [])
     if len(profiles) != 2:
-        checks.append(AuditCheck("compare", "wrong_count", False, "error",
-                                 f"Expected 2 profiles, got {len(profiles)}"))
+        checks.append(AuditCheck("compare", "wrong_count", False, "error", f"Expected 2 profiles, got {len(profiles)}"))
         return checks
 
-    checks.append(AuditCheck("compare", "players_matched", True, "info",
-                             f"Matched: {', '.join(p.get('name', '?') for p in profiles)}"))
+    checks.append(
+        AuditCheck(
+            "compare", "players_matched", True, "info", f"Matched: {', '.join(p.get('name', '?') for p in profiles)}"
+        )
+    )
 
     for prof in profiles:
         pid = prof.get("id")
         if pid not in players_by_id:
-            checks.append(AuditCheck("compare", "ghost_player", False, "error",
-                                     f"Player ID {pid} not in FPL data"))
+            checks.append(AuditCheck("compare", "ghost_player", False, "error", f"Player ID {pid} not in FPL data"))
             continue
 
         ref = players_by_id[pid]
@@ -383,26 +447,36 @@ async def audit_compare(bootstrap, fixtures, players_by_id, teams_by_id,
         # Cost should match
         expected_cost = ref["now_cost"] / 10
         if abs(prof.get("cost", 0) - expected_cost) > 0.1:
-            checks.append(AuditCheck("compare", "cost_mismatch", False, "error",
-                                     f"{prof.get('name')}: cost {prof.get('cost')} != "
-                                     f"FPL API {expected_cost}"))
+            checks.append(
+                AuditCheck(
+                    "compare",
+                    "cost_mismatch",
+                    False,
+                    "error",
+                    f"{prof.get('name')}: cost {prof.get('cost')} != FPL API {expected_cost}",
+                )
+            )
 
         # Blank GW flagging
         blank_gws = prof.get("blank_gameweeks", [])
         if ref["team"] in blanking_teams and next_gw not in blank_gws:
-            checks.append(AuditCheck("compare", "blank_gw_not_flagged", False, "error",
-                                     f"{prof.get('name')} blanks GW{next_gw} but "
-                                     f"blank_gameweeks={blank_gws}"))
+            checks.append(
+                AuditCheck(
+                    "compare",
+                    "blank_gw_not_flagged",
+                    False,
+                    "error",
+                    f"{prof.get('name')} blanks GW{next_gw} but blank_gameweeks={blank_gws}",
+                )
+            )
 
     if not any(not c.passed for c in checks):
-        checks.append(AuditCheck("compare", "all_checks", True, "info",
-                                 "All compare checks passed"))
+        checks.append(AuditCheck("compare", "all_checks", True, "info", "All compare checks passed"))
 
     return checks
 
 
-async def audit_prices(bootstrap, fixtures, players_by_id, teams_by_id,
-                       blanking_teams, next_gw) -> list[AuditCheck]:
+async def audit_prices(bootstrap, fixtures, players_by_id, teams_by_id, blanking_teams, next_gw) -> list[AuditCheck]:
     from app.algorithms.prices import get_price_predictions
 
     checks = []
@@ -416,12 +490,16 @@ async def audit_prices(bootstrap, fixtures, players_by_id, teams_by_id,
     fallers = result.get("likely_fallers", [])
 
     if not risers and not fallers:
-        checks.append(AuditCheck("prices", "empty_output", False, "info",
-                                 "No price movers predicted (may be valid if no transfers yet)"))
+        checks.append(
+            AuditCheck(
+                "prices", "empty_output", False, "info", "No price movers predicted (may be valid if no transfers yet)"
+            )
+        )
         return checks
 
-    checks.append(AuditCheck("prices", "returns_results", True, "info",
-                             f"{len(risers)} risers, {len(fallers)} fallers"))
+    checks.append(
+        AuditCheck("prices", "returns_results", True, "info", f"{len(risers)} risers, {len(fallers)} fallers")
+    )
 
     valid_team_names = {t["short_name"] for t in bootstrap["teams"]}
 
@@ -432,13 +510,13 @@ async def audit_prices(bootstrap, fixtures, players_by_id, teams_by_id,
         pid = player.get("id")
 
         if team not in valid_team_names:
-            checks.append(AuditCheck("prices", "invalid_team", False, "error",
-                                     f"{name} has invalid team: {team}"))
+            checks.append(AuditCheck("prices", "invalid_team", False, "error", f"{name} has invalid team: {team}"))
 
         pos = player.get("position", "?")
         if pos not in {"GKP", "DEF", "MID", "FWD"}:
-            checks.append(AuditCheck("prices", "invalid_position", False, "error",
-                                     f"{name} has invalid position: {pos}"))
+            checks.append(
+                AuditCheck("prices", "invalid_position", False, "error", f"{name} has invalid position: {pos}")
+            )
 
         # Team assignment verification
         if pid and pid in players_by_id:
@@ -447,14 +525,14 @@ async def audit_prices(bootstrap, fixtures, players_by_id, teams_by_id,
                 checks.append(tc)
 
     if not any(not c.passed for c in checks):
-        checks.append(AuditCheck("prices", "all_checks", True, "info",
-                                 "All price checks passed"))
+        checks.append(AuditCheck("prices", "all_checks", True, "info", "All price checks passed"))
 
     return checks
 
 
-async def audit_transfers(bootstrap, fixtures, players_by_id, teams_by_id,
-                          blanking_teams, next_gw, team_id) -> list[AuditCheck]:
+async def audit_transfers(
+    bootstrap, fixtures, players_by_id, teams_by_id, blanking_teams, next_gw, team_id
+) -> list[AuditCheck]:
     from app.algorithms.transfers import get_transfer_suggestions
 
     checks = []
@@ -466,12 +544,12 @@ async def audit_transfers(bootstrap, fixtures, players_by_id, teams_by_id,
 
     suggestions = result.get("suggestions", [])
     if not suggestions:
-        checks.append(AuditCheck("transfers", "no_suggestions", True, "info",
-                                 "No transfer suggestions (squad may be strong)"))
+        checks.append(
+            AuditCheck("transfers", "no_suggestions", True, "info", "No transfer suggestions (squad may be strong)")
+        )
         return checks
 
-    checks.append(AuditCheck("transfers", "returns_results", True, "info",
-                             f"{len(suggestions)} suggestions returned"))
+    checks.append(AuditCheck("transfers", "returns_results", True, "info", f"{len(suggestions)} suggestions returned"))
 
     valid_team_names = {t["short_name"] for t in bootstrap["teams"]}
 
@@ -488,46 +566,79 @@ async def audit_transfers(bootstrap, fixtures, players_by_id, teams_by_id,
             rpos = repl.get("position", "?")
 
             if rid and rid not in players_by_id:
-                checks.append(AuditCheck("transfers", "ghost_player", False, "error",
-                                         f"Replacement {rname} (ID {rid}) not in FPL data"))
+                checks.append(
+                    AuditCheck(
+                        "transfers", "ghost_player", False, "error", f"Replacement {rname} (ID {rid}) not in FPL data"
+                    )
+                )
                 continue
 
             if rteam not in valid_team_names:
-                checks.append(AuditCheck("transfers", "invalid_team", False, "error",
-                                         f"Replacement {rname} has invalid team: {rteam}"))
+                checks.append(
+                    AuditCheck(
+                        "transfers", "invalid_team", False, "error", f"Replacement {rname} has invalid team: {rteam}"
+                    )
+                )
 
             if rpos not in {"GKP", "DEF", "MID", "FWD"}:
-                checks.append(AuditCheck("transfers", "invalid_position", False, "error",
-                                         f"Replacement {rname} has invalid position: {rpos}"))
+                checks.append(
+                    AuditCheck(
+                        "transfers",
+                        "invalid_position",
+                        False,
+                        "error",
+                        f"Replacement {rname} has invalid position: {rpos}",
+                    )
+                )
 
             # Blank GW check
             if rid and rid in players_by_id:
                 ref = players_by_id[rid]
                 if ref["team"] in blanking_teams:
-                    checks.append(AuditCheck("transfers", "blank_gw_leak", False, "error",
-                                             f"Replacement {rname} has no fixture in GW{next_gw}"))
+                    checks.append(
+                        AuditCheck(
+                            "transfers",
+                            "blank_gw_leak",
+                            False,
+                            "error",
+                            f"Replacement {rname} has no fixture in GW{next_gw}",
+                        )
+                    )
 
                 # Status check
                 status = ref.get("status", "a")
                 if status in INJURY_STATUSES:
-                    checks.append(AuditCheck("transfers", "injured_recommended", False, "error",
-                                             f"Replacement {rname} has status '{status}'"))
+                    checks.append(
+                        AuditCheck(
+                            "transfers",
+                            "injured_recommended",
+                            False,
+                            "error",
+                            f"Replacement {rname} has status '{status}'",
+                        )
+                    )
 
             # Position match
             if sell.get("position") and rpos != POSITION_MAP.get(sell.get("position_type"), rpos):
-                checks.append(AuditCheck("transfers", "position_mismatch", False, "error",
-                                         f"Selling {sell_name} ({sell.get('position')}) "
-                                         f"but replacement {rname} is {rpos}"))
+                checks.append(
+                    AuditCheck(
+                        "transfers",
+                        "position_mismatch",
+                        False,
+                        "error",
+                        f"Selling {sell_name} ({sell.get('position')}) but replacement {rname} is {rpos}",
+                    )
+                )
 
     if not any(not c.passed for c in checks):
-        checks.append(AuditCheck("transfers", "all_checks", True, "info",
-                                 "All transfer checks passed"))
+        checks.append(AuditCheck("transfers", "all_checks", True, "info", "All transfer checks passed"))
 
     return checks
 
 
-async def audit_scout(bootstrap, fixtures, players_by_id, teams_by_id,
-                      blanking_teams, next_gw, team_id) -> list[AuditCheck]:
+async def audit_scout(
+    bootstrap, fixtures, players_by_id, teams_by_id, blanking_teams, next_gw, team_id
+) -> list[AuditCheck]:
     from app.algorithms.scout import get_squad_scout
 
     checks = []
@@ -539,12 +650,12 @@ async def audit_scout(bootstrap, fixtures, players_by_id, teams_by_id,
 
     squad = result.get("squad_report", [])
     if not squad:
-        checks.append(AuditCheck("scout", "empty_squad", False, "warning",
-                                 "Scout returned empty squad (GW may not have started)"))
+        checks.append(
+            AuditCheck("scout", "empty_squad", False, "warning", "Scout returned empty squad (GW may not have started)")
+        )
         return checks
 
-    checks.append(AuditCheck("scout", "returns_results", True, "info",
-                             f"{len(squad)} squad players returned"))
+    checks.append(AuditCheck("scout", "returns_results", True, "info", f"{len(squad)} squad players returned"))
 
     valid_team_names = {t["short_name"] for t in bootstrap["teams"]}
     valid_positions = {"GKP", "DEF", "MID", "FWD"}
@@ -555,34 +666,39 @@ async def audit_scout(bootstrap, fixtures, players_by_id, teams_by_id,
         pos = p.get("position", "?")
 
         if team not in valid_team_names:
-            checks.append(AuditCheck("scout", "invalid_team", False, "error",
-                                     f"{name} has invalid team: {team}"))
+            checks.append(AuditCheck("scout", "invalid_team", False, "error", f"{name} has invalid team: {team}"))
 
         if pos not in valid_positions:
-            checks.append(AuditCheck("scout", "invalid_position", False, "error",
-                                     f"{name} has invalid position: {pos}"))
+            checks.append(
+                AuditCheck("scout", "invalid_position", False, "error", f"{name} has invalid position: {pos}")
+            )
 
         # Cross-ref ep_next with bootstrap by matching name + team
-        matches = [pl for pl in bootstrap["elements"]
-                   if pl["web_name"] == name and
-                   teams_by_id.get(pl["team"], {}).get("short_name") == team]
+        matches = [
+            pl
+            for pl in bootstrap["elements"]
+            if pl["web_name"] == name and teams_by_id.get(pl["team"], {}).get("short_name") == team
+        ]
         if matches:
             ref = matches[0]
             ref_ep = float(ref.get("ep_next") or 0)
             tool_ep = float(p.get("ep_next") or 0)
             if abs(ref_ep - tool_ep) > 0.5:
-                checks.append(AuditCheck("scout", "ep_next_mismatch", False, "warning",
-                                         f"{name}: ep_next {tool_ep} vs FPL API {ref_ep}"))
+                checks.append(
+                    AuditCheck(
+                        "scout", "ep_next_mismatch", False, "warning", f"{name}: ep_next {tool_ep} vs FPL API {ref_ep}"
+                    )
+                )
 
     if not any(not c.passed for c in checks):
-        checks.append(AuditCheck("scout", "all_checks", True, "info",
-                                 "All scout checks passed"))
+        checks.append(AuditCheck("scout", "all_checks", True, "info", "All scout checks passed"))
 
     return checks
 
 
-async def audit_chips(bootstrap, fixtures, players_by_id, teams_by_id,
-                      blanking_teams, next_gw, team_id) -> list[AuditCheck]:
+async def audit_chips(
+    bootstrap, fixtures, players_by_id, teams_by_id, blanking_teams, next_gw, team_id
+) -> list[AuditCheck]:
     from app.algorithms.chips import get_chip_strategy
 
     checks = []
@@ -594,32 +710,37 @@ async def audit_chips(bootstrap, fixtures, players_by_id, teams_by_id,
 
     recommendations = result.get("recommendations", [])
     current_gw = get_current_gameweek(bootstrap)
-    valid_chips = {"wildcard", "bboost", "freehit", "3xc",
-                   "Wildcard", "Bench Boost", "Free Hit", "Triple Captain"}
+    valid_chips = {"wildcard", "bboost", "freehit", "3xc", "Wildcard", "Bench Boost", "Free Hit", "Triple Captain"}
 
     for rec in recommendations:
         chip = rec.get("chip", "")
         best_gw = rec.get("recommended_gameweek")
 
         if chip not in valid_chips:
-            checks.append(AuditCheck("chips", "invalid_chip", False, "error",
-                                     f"Unknown chip: {chip}"))
+            checks.append(AuditCheck("chips", "invalid_chip", False, "error", f"Unknown chip: {chip}"))
 
         if best_gw is not None and best_gw < current_gw:
-            checks.append(AuditCheck("chips", "past_gw_recommended", False, "error",
-                                     f"Chip {chip} recommended for GW{best_gw} "
-                                     f"which is in the past (current: GW{current_gw})"))
+            checks.append(
+                AuditCheck(
+                    "chips",
+                    "past_gw_recommended",
+                    False,
+                    "error",
+                    f"Chip {chip} recommended for GW{best_gw} which is in the past (current: GW{current_gw})",
+                )
+            )
 
         if best_gw is not None and best_gw > 38:
-            checks.append(AuditCheck("chips", "invalid_gw", False, "error",
-                                     f"Chip {chip} recommended for GW{best_gw} (max is 38)"))
+            checks.append(
+                AuditCheck(
+                    "chips", "invalid_gw", False, "error", f"Chip {chip} recommended for GW{best_gw} (max is 38)"
+                )
+            )
 
-    checks.append(AuditCheck("chips", "returns_results", True, "info",
-                             f"{len(recommendations)} chip recommendations"))
+    checks.append(AuditCheck("chips", "returns_results", True, "info", f"{len(recommendations)} chip recommendations"))
 
     if not any(not c.passed for c in checks):
-        checks.append(AuditCheck("chips", "all_checks", True, "info",
-                                 "All chip checks passed"))
+        checks.append(AuditCheck("chips", "all_checks", True, "info", "All chip checks passed"))
 
     return checks
 
@@ -628,6 +749,7 @@ async def audit_chips(bootstrap, fixtures, players_by_id, teams_by_id,
 # Cross-cutting checks
 # ---------------------------------------------------------------------------
 
+
 def check_stale_data(bootstrap) -> list[AuditCheck]:
     """Check if FPL API data looks stale."""
     checks = []
@@ -635,23 +757,41 @@ def check_stale_data(bootstrap) -> list[AuditCheck]:
     # If ALL players have 0 transfers_in_event, data might be stale
     total_transfers = sum(p.get("transfers_in_event", 0) for p in bootstrap["elements"])
     if total_transfers == 0:
-        checks.append(AuditCheck("data_quality", "stale_transfers", False, "warning",
-                                 "All players have 0 transfers_in_event — API data may be stale"))
+        checks.append(
+            AuditCheck(
+                "data_quality",
+                "stale_transfers",
+                False,
+                "warning",
+                "All players have 0 transfers_in_event — API data may be stale",
+            )
+        )
     else:
-        checks.append(AuditCheck("data_quality", "transfers_active", True, "info",
-                                 f"Total transfers_in_event: {total_transfers:,}"))
+        checks.append(
+            AuditCheck(
+                "data_quality", "transfers_active", True, "info", f"Total transfers_in_event: {total_transfers:,}"
+            )
+        )
 
     # Check player count
     count = len(bootstrap["elements"])
     if count < 500:
-        checks.append(AuditCheck("data_quality", "low_player_count", False, "warning",
-                                 f"Only {count} players in bootstrap (expected ~700+)"))
+        checks.append(
+            AuditCheck(
+                "data_quality",
+                "low_player_count",
+                False,
+                "warning",
+                f"Only {count} players in bootstrap (expected ~700+)",
+            )
+        )
 
     # Check team count
     team_count = len(bootstrap["teams"])
     if team_count != 20:
-        checks.append(AuditCheck("data_quality", "wrong_team_count", False, "error",
-                                 f"Expected 20 teams, got {team_count}"))
+        checks.append(
+            AuditCheck("data_quality", "wrong_team_count", False, "error", f"Expected 20 teams, got {team_count}")
+        )
 
     return checks
 
@@ -659,6 +799,7 @@ def check_stale_data(bootstrap) -> list[AuditCheck]:
 # ---------------------------------------------------------------------------
 # Report output
 # ---------------------------------------------------------------------------
+
 
 def print_report(checks: list[AuditCheck], gameweek: int) -> dict:
     """Print human-readable report and return summary dict."""
@@ -715,8 +856,10 @@ def print_report(checks: list[AuditCheck], gameweek: int) -> dict:
     print("-" * 60)
     for tool, stats in sorted(tools.items()):
         status = "OK" if stats["errors"] == 0 else "FAIL"
-        print(f"  {tool:<20} {stats['checks']:>7} {stats['passed']:>6} "
-              f"{stats['errors']:>5} {stats['warnings']:>5}  {status}")
+        print(
+            f"  {tool:<20} {stats['checks']:>7} {stats['passed']:>6} "
+            f"{stats['errors']:>5} {stats['warnings']:>5}  {status}"
+        )
     print("=" * 60)
     print()
 
@@ -752,21 +895,24 @@ def append_csv(summary: dict, gameweek: int):
         writer = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
         if not file_exists:
             writer.writeheader()
-        writer.writerow({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "gameweek": gameweek,
-            "total_checks": summary["total_checks"],
-            "passed": summary["passed"],
-            "errors": summary["errors"],
-            "warnings": summary["warnings"],
-            "pass_rate": summary["pass_rate_pct"],
-        })
+        writer.writerow(
+            {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "gameweek": gameweek,
+                "total_checks": summary["total_checks"],
+                "passed": summary["passed"],
+                "errors": summary["errors"],
+                "warnings": summary["warnings"],
+                "pass_rate": summary["pass_rate_pct"],
+            }
+        )
     print(f"  CSV appended to {AUDIT_CSV}")
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 async def run_audit(team_id: int, tool_filter: str | None = None) -> list[AuditCheck]:
     bootstrap, fixtures = await asyncio.gather(get_bootstrap(), get_fixtures())
@@ -786,22 +932,18 @@ async def run_audit(team_id: int, tool_filter: str | None = None) -> list[AuditC
 
     # Define all audit tasks
     audit_tasks = {
-        "captain": lambda: audit_captain(bootstrap, fixtures, players_by_id,
-                                         teams_by_id, blanking_teams, next_gw),
-        "differentials": lambda: audit_differentials(bootstrap, fixtures, players_by_id,
-                                                     teams_by_id, blanking_teams, next_gw),
-        "fixtures": lambda: audit_fixtures(bootstrap, fixtures, players_by_id,
-                                           teams_by_id, blanking_teams, next_gw),
-        "compare": lambda: audit_compare(bootstrap, fixtures, players_by_id,
-                                         teams_by_id, blanking_teams, next_gw),
-        "prices": lambda: audit_prices(bootstrap, fixtures, players_by_id,
-                                       teams_by_id, blanking_teams, next_gw),
-        "transfers": lambda: audit_transfers(bootstrap, fixtures, players_by_id,
-                                             teams_by_id, blanking_teams, next_gw, team_id),
-        "scout": lambda: audit_scout(bootstrap, fixtures, players_by_id,
-                                     teams_by_id, blanking_teams, next_gw, team_id),
-        "chips": lambda: audit_chips(bootstrap, fixtures, players_by_id,
-                                     teams_by_id, blanking_teams, next_gw, team_id),
+        "captain": lambda: audit_captain(bootstrap, fixtures, players_by_id, teams_by_id, blanking_teams, next_gw),
+        "differentials": lambda: audit_differentials(
+            bootstrap, fixtures, players_by_id, teams_by_id, blanking_teams, next_gw
+        ),
+        "fixtures": lambda: audit_fixtures(bootstrap, fixtures, players_by_id, teams_by_id, blanking_teams, next_gw),
+        "compare": lambda: audit_compare(bootstrap, fixtures, players_by_id, teams_by_id, blanking_teams, next_gw),
+        "prices": lambda: audit_prices(bootstrap, fixtures, players_by_id, teams_by_id, blanking_teams, next_gw),
+        "transfers": lambda: audit_transfers(
+            bootstrap, fixtures, players_by_id, teams_by_id, blanking_teams, next_gw, team_id
+        ),
+        "scout": lambda: audit_scout(bootstrap, fixtures, players_by_id, teams_by_id, blanking_teams, next_gw, team_id),
+        "chips": lambda: audit_chips(bootstrap, fixtures, players_by_id, teams_by_id, blanking_teams, next_gw, team_id),
     }
 
     # Filter if requested
@@ -821,8 +963,7 @@ async def run_audit(team_id: int, tool_filter: str | None = None) -> list[AuditC
 
     for name, result in zip(task_names, results):
         if isinstance(result, Exception):
-            all_checks.append(AuditCheck(name, "audit_crash", False, "error",
-                                         f"Audit function crashed: {result}"))
+            all_checks.append(AuditCheck(name, "audit_crash", False, "error", f"Audit function crashed: {result}"))
             traceback.print_exception(type(result), result, result.__traceback__)
         else:
             all_checks.extend(result)
@@ -835,12 +976,9 @@ async def run_audit(team_id: int, tool_filter: str | None = None) -> list[AuditC
 
 def main():
     parser = argparse.ArgumentParser(description="FPL Intelligence accuracy audit")
-    parser.add_argument("--team-id", type=int, default=DEFAULT_TEAM_ID,
-                        help="FPL team ID for team-dependent tools")
-    parser.add_argument("--tool", type=str, default=None,
-                        help="Run checks for a single tool only")
-    parser.add_argument("--json-only", action="store_true",
-                        help="Suppress stdout, just write JSON")
+    parser.add_argument("--team-id", type=int, default=DEFAULT_TEAM_ID, help="FPL team ID for team-dependent tools")
+    parser.add_argument("--tool", type=str, default=None, help="Run checks for a single tool only")
+    parser.add_argument("--json-only", action="store_true", help="Suppress stdout, just write JSON")
     args = parser.parse_args()
 
     checks = asyncio.run(run_audit(team_id=args.team_id, tool_filter=args.tool))
